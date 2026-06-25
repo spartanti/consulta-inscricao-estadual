@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Consulta de Inscrição Estadual — Brasil</title>
+  <meta name="description" content="Consulte a Inscrição Estadual (IE) de empresas de todos os estados do Brasil a partir do CNPJ." />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="container">
+      <span class="badge">BR</span>
+      <h1>Consulta de Inscrição Estadual</h1>
+      <p class="subtitle">Empresas de todo o Brasil · busca por CNPJ</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="card">
+      <form id="form" autocomplete="off">
+        <label for="cnpj">CNPJ</label>
+        <div class="input-row">
+          <input
+            id="cnpj"
+            name="cnpj"
+            type="text"
+            inputmode="numeric"
+            placeholder="00.000.000/0000-00"
+            maxlength="18"
+            aria-describedby="hint"
+            required
+          />
+          <button id="submit" type="submit">Consultar</button>
+        </div>
+        <small id="hint" class="hint">Digite os 14 dígitos do CNPJ. A formatação é automática.</small>
+      </form>
+      <p class="aviso-limite"><span class="aviso-ico">i</span> Limite de <strong>3 consultas por minuto por IP</strong>. Aguarde alguns segundos entre as buscas.</p>
+    </section>
+
+    <!-- Banner publicitário: TagPlus (link de afiliado) -->
+    <a
+      class="adbanner"
+      href="https://sistema.tagplus.com.br/checkout/?ref=sistema_parceiros&id_funcionario=1405"
+      target="_blank"
+      rel="sponsored noopener"
+      aria-label="TagPlus — sistema de gestão. Experimente agora."
+    >
+      <span class="ad-tag">Publicidade</span>
+      <span class="ad-shine"></span>
+      <div class="ad-content">
+        <div class="ad-text">
+          <span class="ad-brand">Tag<span class="ad-brand-plus">Plus</span></span>
+          <strong class="ad-title">Sistema de gestão completo para sua empresa</strong>
+          <span class="ad-sub">Emita NF-e e NFC-e, controle estoque, vendas e financeiro — tudo num só lugar.</span>
+          <span class="ad-free">✓ Teste grátis por 7 dias</span>
+        </div>
+        <span class="ad-cta">Teste 7 dias grátis <span class="ad-arrow">→</span></span>
+      </div>
+    </a>
+
+    <section id="status" class="status" aria-live="polite" hidden></section>
+
+    <section id="result" class="card result" hidden>
+      <div class="result-head">
+        <div>
+          <h2 id="r-razao">—</h2>
+          <p id="r-fantasia" class="muted"></p>
+        </div>
+        <span id="r-situacao" class="chip"></span>
+      </div>
+
+      <!-- Destaque: Inscrição Estadual (todas as UFs) -->
+      <div class="ie-box" id="ie-box">
+        <div class="ie-head">
+          <span class="ie-label" id="ie-label">Inscrição Estadual</span>
+          <label class="uf-filter-wrap">
+            <span>Estado:</span>
+            <select id="uf-filter" class="uf-filter"></select>
+          </label>
+        </div>
+        <div id="ie-list"></div>
+        <div class="ie-status-line">
+          <span class="ie-sublabel">Situação do CNPJ:</span>
+          <span id="ie-cnpj-status" class="chip">—</span>
+          <span id="ie-cnpj-status-data" class="muted"></span>
+        </div>
+      </div>
+
+      <!-- Identificação -->
+      <h3 class="sec-title">Identificação</h3>
+      <dl class="details">
+        <div><dt>CNPJ</dt><dd id="r-cnpj">—</dd></div>
+        <div><dt>Matriz / Filial</dt><dd id="r-tipo">—</dd></div>
+        <div><dt>Natureza jurídica</dt><dd id="r-natureza">—</dd></div>
+        <div><dt>Porte</dt><dd id="r-porte">—</dd></div>
+        <div><dt>Capital social</dt><dd id="r-capital">—</dd></div>
+        <div><dt>Início de atividade</dt><dd id="r-abertura">—</dd></div>
+      </dl>
+
+      <!-- Situação cadastral -->
+      <h3 class="sec-title">Situação cadastral</h3>
+      <dl class="details">
+        <div><dt>Situação</dt><dd id="r-sit">—</dd></div>
+        <div><dt>Data da situação</dt><dd id="r-sit-data">—</dd></div>
+        <div><dt>Motivo</dt><dd id="r-sit-motivo">—</dd></div>
+        <div id="row-especial" hidden><dt>Situação especial</dt><dd id="r-sit-especial">—</dd></div>
+      </dl>
+
+      <!-- Endereço -->
+      <h3 class="sec-title">Endereço</h3>
+      <dl class="details">
+        <div><dt>Logradouro</dt><dd id="r-end-log">—</dd></div>
+        <div><dt>Bairro</dt><dd id="r-end-bairro">—</dd></div>
+        <div><dt>Município / UF</dt><dd id="r-end-municipio">—</dd></div>
+        <div><dt>CEP</dt><dd id="r-end-cep">—</dd></div>
+      </dl>
+
+      <!-- Contato -->
+      <h3 class="sec-title">Contato</h3>
+      <dl class="details">
+        <div><dt>Telefone</dt><dd id="r-tel1">—</dd></div>
+        <div id="row-tel2" hidden><dt>Telefone 2</dt><dd id="r-tel2">—</dd></div>
+        <div><dt>E-mail</dt><dd id="r-email">—</dd></div>
+      </dl>
+
+      <!-- Atividades econômicas -->
+      <h3 class="sec-title">Atividade econômica (CNAE)</h3>
+      <div class="cnae" id="r-cnae-principal"></div>
+      <details id="cnae-sec-wrap" class="collapse" hidden>
+        <summary>Atividades secundárias (<span id="cnae-sec-count">0</span>)</summary>
+        <ul id="r-cnae-sec" class="cnae-list"></ul>
+      </details>
+
+      <!-- Simples / MEI -->
+      <h3 class="sec-title">Simples Nacional / MEI</h3>
+      <dl class="details">
+        <div><dt>Optante pelo Simples</dt><dd id="r-simples">—</dd></div>
+        <div><dt>Optante pelo MEI</dt><dd id="r-mei">—</dd></div>
+      </dl>
+
+      <!-- Quadro de sócios -->
+      <h3 class="sec-title" id="socios-title">Quadro de sócios e administradores</h3>
+      <ul id="r-socios" class="socios"></ul>
+
+      <p class="updated">Dados atualizados em <span id="r-atualizado">—</span></p>
+    </section>
+
+    <p class="source">
+      Fonte: API pública <strong>CNPJ.ws</strong> (dados da Receita Federal e SEFAZ).
+      Para fins oficiais, confirme no <a href="https://internet.sefaz.es.gov.br/" target="_blank" rel="noopener">SINTEGRA/SEFAZ-ES</a>.
+    </p>
+  </main>
+
+  <footer class="container footer">
+    <small>Desenvolvido por <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">Spartan TI</a></small>
+  </footer>
+
+  <script src="/app.js"></script>
+</body>
+</html>

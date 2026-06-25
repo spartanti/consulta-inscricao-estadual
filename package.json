@@ -1,0 +1,11 @@
+{
+  "name": "consulta-ie-es",
+  "version": "1.0.0",
+  "description": "Consulta de Inscricao Estadual a partir do CNPJ para empresas do Espirito Santo",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "license": "MIT"
+}
