@@ -260,14 +260,20 @@ function serveStatic(req, res) {
     return res.end('Forbidden');
   }
 
+  const isHead = req.method === 'HEAD';
+
   fs.readFile(filePath, (err, content) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      return res.end('Arquivo nao encontrado');
+      return res.end(isHead ? undefined : 'Arquivo nao encontrado');
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream' });
-    res.end(content);
+    res.writeHead(200, {
+      'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream',
+      'Content-Length': content.length,
+    });
+    // HEAD: envia apenas os cabecalhos, sem corpo.
+    res.end(isHead ? undefined : content);
   });
 }
 
@@ -292,8 +298,8 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // Arquivos estaticos
-  if (req.method === 'GET') {
+  // Arquivos estaticos (GET e HEAD)
+  if (req.method === 'GET' || req.method === 'HEAD') {
     return serveStatic(req, res);
   }
 
