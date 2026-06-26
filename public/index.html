@@ -5,9 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Consulta de Inscrição Estadual (IE) por CNPJ — SINTEGRA Brasil</title>
   <meta name="description" content="Consulte gratuitamente a Inscrição Estadual (IE) de empresas de todos os estados do Brasil informando o CNPJ. Resultado na hora, com situação cadastral e dados públicos." />
-  <meta name="robots" content="index, follow" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+  <meta name="author" content="SINTEGRA Brasil" />
   <link rel="canonical" href="https://www.sintegrabrasil.com.br/" />
   <meta name="theme-color" content="#0a3d62" />
+
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="apple-touch-icon" href="/favicon.svg" />
+  <link rel="preconnect" href="https://publica.cnpj.ws" crossorigin />
+  <link rel="dns-prefetch" href="https://publica.cnpj.ws" />
 
   <!-- Open Graph / redes sociais -->
   <meta property="og:type" content="website" />
@@ -16,11 +22,79 @@
   <meta property="og:url" content="https://www.sintegrabrasil.com.br/" />
   <meta property="og:locale" content="pt_BR" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
-  <meta name="twitter:card" content="summary" />
+  <meta property="og:image" content="https://www.sintegrabrasil.com.br/og-image.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Consulta de Inscrição Estadual por CNPJ — SINTEGRA Brasil" />
   <meta name="twitter:description" content="Consulte a Inscrição Estadual de empresas de todo o Brasil pelo CNPJ. Grátis e na hora." />
+  <meta name="twitter:image" content="https://www.sintegrabrasil.com.br/og-image.svg" />
 
   <link rel="stylesheet" href="/style.css" />
+
+  <!-- Dados estruturados (Schema.org) -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://www.sintegrabrasil.com.br/#website",
+        "url": "https://www.sintegrabrasil.com.br/",
+        "name": "SINTEGRA Brasil",
+        "description": "Consulta de Inscrição Estadual (IE) por CNPJ em todos os estados do Brasil.",
+        "inLanguage": "pt-BR",
+        "publisher": { "@id": "https://www.sintegrabrasil.com.br/#org" }
+      },
+      {
+        "@type": "Organization",
+        "@id": "https://www.sintegrabrasil.com.br/#org",
+        "name": "SINTEGRA Brasil",
+        "url": "https://www.sintegrabrasil.com.br/",
+        "logo": "https://www.sintegrabrasil.com.br/favicon.svg",
+        "description": "Serviço independente de consulta de Inscrição Estadual por CNPJ. Sem vínculo com órgãos públicos."
+      },
+      {
+        "@type": "WebApplication",
+        "name": "Consulta de Inscrição Estadual por CNPJ",
+        "url": "https://www.sintegrabrasil.com.br/",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Web",
+        "browserRequirements": "Requer JavaScript",
+        "inLanguage": "pt-BR",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
+      },
+      {
+        "@type": "FAQPage",
+        "mainEntity": [
+          {
+            "@type": "Question",
+            "name": "O que é Inscrição Estadual (IE)?",
+            "acceptedAnswer": { "@type": "Answer", "text": "A Inscrição Estadual é o registro de uma empresa no cadastro de contribuintes da Secretaria da Fazenda (SEFAZ) do estado. É obrigatória para empresas que recolhem ICMS, como comércio e indústria." }
+          },
+          {
+            "@type": "Question",
+            "name": "Como consultar a Inscrição Estadual pelo CNPJ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Basta informar o CNPJ da empresa no campo de busca e clicar em Consultar. O resultado mostra a Inscrição Estadual, a situação cadastral e os dados públicos da empresa." }
+          },
+          {
+            "@type": "Question",
+            "name": "É possível consultar a IE de qualquer estado?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sim. A consulta retorna as inscrições estaduais de todos os estados em que a empresa está cadastrada. Você pode filtrar por uma UF específica ou ver todas de uma vez." }
+          },
+          {
+            "@type": "Question",
+            "name": "A consulta de Inscrição Estadual é gratuita?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Sim, a consulta é totalmente gratuita e não exige cadastro. Informe o CNPJ e veja o resultado na hora." }
+          },
+          {
+            "@type": "Question",
+            "name": "Toda empresa tem Inscrição Estadual?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Não. Empresas exclusivamente prestadoras de serviços, que recolhem ISS em vez de ICMS, geralmente não possuem Inscrição Estadual." }
+          }
+        ]
+      }
+    ]
+  }
+  </script>
 </head>
 <body>
   <header class="topbar">
@@ -160,6 +234,61 @@
 
       <p class="updated">Dados atualizados em <span id="r-atualizado">—</span></p>
     </section>
+
+    <!-- Conteúdo informativo (SEO) -->
+    <article class="seo-content">
+      <h2>Consulta de Inscrição Estadual por CNPJ</h2>
+      <p>
+        O <strong>SINTEGRA Brasil</strong> permite <strong>consultar a Inscrição Estadual (IE)</strong>
+        de empresas de <strong>todos os estados do Brasil</strong> a partir do <strong>CNPJ</strong>.
+        A consulta é gratuita, não exige cadastro e mostra o resultado na hora, junto da situação
+        cadastral, endereço, atividades (CNAE) e demais dados públicos da empresa.
+      </p>
+
+      <h3>O que é a Inscrição Estadual?</h3>
+      <p>
+        A Inscrição Estadual é o número de registro de uma empresa no cadastro de contribuintes
+        da Secretaria da Fazenda (SEFAZ) do estado. Ela é obrigatória para empresas que recolhem
+        <abbr title="Imposto sobre Circulação de Mercadorias e Serviços">ICMS</abbr> — como comércio,
+        indústria e atacado — e é exigida para a emissão de notas fiscais de produtos.
+      </p>
+
+      <h3>Como consultar a IE pelo CNPJ</h3>
+      <ol class="seo-steps">
+        <li>Digite o <strong>CNPJ</strong> da empresa no campo de busca acima.</li>
+        <li>Clique em <strong>Consultar</strong>.</li>
+        <li>Veja a <strong>Inscrição Estadual</strong> e a situação cadastral; use o seletor de estado para filtrar por UF.</li>
+      </ol>
+
+      <h3>Inscrição Estadual em todos os estados</h3>
+      <p>
+        Uma mesma empresa pode ter Inscrição Estadual em mais de um estado. A consulta retorna
+        todas as inscrições encontradas, indicando a <strong>UF</strong> e se cada uma está
+        <strong>ativa</strong> ou <strong>baixada</strong>. É possível consultar a IE em
+        AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO,
+        RR, SC, SP, SE e TO.
+      </p>
+
+      <h2>Perguntas frequentes</h2>
+      <div class="faq">
+        <details>
+          <summary>A consulta de Inscrição Estadual é gratuita?</summary>
+          <p>Sim. A consulta é totalmente gratuita e não exige cadastro. Informe o CNPJ e veja o resultado imediatamente.</p>
+        </details>
+        <details>
+          <summary>Toda empresa tem Inscrição Estadual?</summary>
+          <p>Não. Empresas exclusivamente prestadoras de serviços, que recolhem ISS em vez de ICMS, em geral não possuem Inscrição Estadual.</p>
+        </details>
+        <details>
+          <summary>O que significa IE "ativa" ou "baixada"?</summary>
+          <p>Uma IE <strong>ativa</strong> indica que a empresa está habilitada como contribuinte do ICMS naquele estado. <strong>Baixada</strong> ou inativa indica que o registro foi encerrado ou suspenso.</p>
+        </details>
+        <details>
+          <summary>Os dados são oficiais?</summary>
+          <p>Os dados têm caráter informativo e vêm de bases públicas. Para fins oficiais, confirme no SINTEGRA da SEFAZ do estado correspondente.</p>
+        </details>
+      </div>
+    </article>
 
     <p class="source">
       Fonte: API pública <strong>CNPJ.ws</strong> (dados da Receita Federal e SEFAZ).
