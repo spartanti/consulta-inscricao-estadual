@@ -136,9 +136,12 @@ function streamZipCsv(cmd, onLine) {
         }).catch(() => rl.resume());
       }
     });
-    rl.on('close', resolve);
-    sh.on('error', reject);
-    sh.on('close', (code) => { if (code && code !== 0 && !stopped) reject(new Error('curl/funzip saiu com ' + code)); });
+    let done = false;
+    const finish = () => { if (!done) { done = true; resolve(); } };
+    rl.on('close', finish);
+    sh.on('error', (e) => { console.warn('  aviso (stream):', e.message); finish(); });
+    // Tolera arquivo truncado/parcial: processa o que deu para ler.
+    sh.on('close', (code) => { if (code && code !== 0 && !stopped) console.warn('  aviso: arquivo parcial/truncado (funzip code ' + code + ')'); finish(); });
   });
 }
 
