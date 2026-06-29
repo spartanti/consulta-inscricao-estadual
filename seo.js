@@ -175,7 +175,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
     <p class="footer-links">
       <a href="/">Início</a> · <a href="/validar-inscricao-estadual">Validar IE</a> ·
       <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
-      <a href="/consultas">Consultas</a> · <a href="/incorporar">Incorporar</a><br />
+      <a href="/incorporar">Incorporar</a><br />
       <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
       <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos</a>
     </p>

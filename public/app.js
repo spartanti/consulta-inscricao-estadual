@@ -303,15 +303,18 @@ function toggleFav(data) {
 
 function renderSaved() {
   const favEl = document.getElementById('fav-list');
-  const histEl = document.getElementById('hist-list');
   const box = document.getElementById('saved');
-  if (!favEl || !histEl || !box) return;
+  if (!favEl || !box) return;
   const li = (e) => `<li><a href="/cnpj/${e.cnpj}">${esc(e.razao || maskCnpj(e.cnpj))}</a> <span class="muted">${maskCnpj(e.cnpj)}${e.uf ? ' · ' + esc(e.uf) : ''}</span></li>`;
   const fav = lsGet(LS_FAV);
-  const hist = lsGet(LS_HIST);
   favEl.innerHTML = fav.length ? fav.map(li).join('') : '<li class="muted">Nenhum favorito ainda.</li>';
-  histEl.innerHTML = hist.length ? hist.map(li).join('') : '<li class="muted">Nenhuma consulta ainda.</li>';
-  box.hidden = !(fav.length || hist.length);
+  // Coluna de "Consultas recentes" foi ocultada; renderiza só se existir.
+  const histEl = document.getElementById('hist-list');
+  if (histEl) {
+    const hist = lsGet(LS_HIST);
+    histEl.innerHTML = hist.length ? hist.map(li).join('') : '<li class="muted">Nenhuma consulta ainda.</li>';
+  }
+  box.hidden = !fav.length;
 }
 
 function updateFavBtn(cnpj) {
