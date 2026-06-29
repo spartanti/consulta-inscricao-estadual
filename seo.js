@@ -175,7 +175,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
     <p class="footer-links">
       <a href="/">Início</a> · <a href="/validar-inscricao-estadual">Validar IE</a> ·
       <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
-      <a href="/incorporar">Incorporar</a><br />
+      <a href="/incorporar">Incorporar</a> · <a href="/api">API</a><br />
       <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
       <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos</a>
     </p>
@@ -676,6 +676,71 @@ function renderEmbed() {
   return contentPage('/incorporar', 'Incorporar consulta de Inscrição Estadual no seu site — SINTEGRA Brasil', 'Adicione gratuitamente a caixa de consulta de Inscrição Estadual por CNPJ no seu site.', 'Incorporar o widget no seu site', inner, 'Incorporar');
 }
 
+// --- Documentação da API pública ---
+function renderApiDocs() {
+  const ex = `${SITE_URL}/api/v1/cnpj/00000000000191`;
+  const respExemplo = `{
+  "cnpj": "00000000000191",
+  "razao_social": "BANCO DO BRASIL SA",
+  "nome_fantasia": "DIRECAO GERAL",
+  "situacao_cadastral": "Ativa",
+  "uf": "DF",
+  "municipio": "Brasília",
+  "inscricoes_estaduais": [
+    { "inscricao_estadual": "0809427800174", "ativo": true, "uf": "DF", "atualizado_em": "10/10/2025" }
+  ],
+  "endereco": { "logradouro": "...", "bairro": "...", "municipio": "Brasília", "uf": "DF", "cep": "70040-912" },
+  "atividade_principal": { "codigo": "6422-1/00", "descricao": "Bancos múltiplos, com carteira comercial" }
+}`;
+  const curl = `curl "${ex}"`;
+  const js = `fetch("${ex}")
+  .then(r => r.json())
+  .then(data => console.log(data.inscricoes_estaduais));`;
+  const inner = `
+    <p>API pública e gratuita para consultar a <strong>Inscrição Estadual (IE)</strong> e dados cadastrais
+    públicos de empresas a partir do <strong>CNPJ</strong>.</p>
+
+    <h2>Endpoint</h2>
+    <pre class="codeblock">GET ${SITE_URL}/api/v1/cnpj/{cnpj}</pre>
+    <p>O <code>{cnpj}</code> pode ter 14 dígitos (com ou sem pontuação). Resposta em <strong>JSON</strong>.</p>
+
+    <h2>Exemplo (cURL)</h2>
+    <pre class="codeblock">${escapeHtml(curl)}</pre>
+    <h2>Exemplo (JavaScript)</h2>
+    <pre class="codeblock">${escapeHtml(js)}</pre>
+
+    <h2>Resposta (exemplo)</h2>
+    <pre class="codeblock">${escapeHtml(respExemplo)}</pre>
+
+    <h2>Características</h2>
+    <ul>
+      <li><strong>Autenticação:</strong> não é necessária (uso gratuito).</li>
+      <li><strong>CORS:</strong> habilitado (<code>Access-Control-Allow-Origin: *</code>) — pode chamar do navegador.</li>
+      <li><strong>Limite de uso:</strong> até 30 requisições por minuto por IP. Consultas já feitas são servidas de cache (mais rápido); CNPJs novos dependem da fonte de dados.</li>
+      <li><strong>Privacidade:</strong> a API pública <strong>não</strong> retorna o quadro de sócios (QSA).</li>
+    </ul>
+
+    <h2>Códigos de resposta</h2>
+    <ul>
+      <li><code>200</code> — sucesso (JSON com os dados)</li>
+      <li><code>400</code> — CNPJ inválido</li>
+      <li><code>404</code> — CNPJ não encontrado</li>
+      <li><code>429</code> — limite de requisições excedido</li>
+    </ul>
+
+    <p class="source">Dados públicos com caráter informativo. Ao usar a API, você concorda com os
+    <a href="/termos">Termos de Uso</a>. Pedimos, quando possível, atribuição com link para
+    <a href="${SITE_URL}">sintegrabrasil.com.br</a>.</p>`;
+  return contentPage(
+    '/api',
+    'API de consulta de Inscrição Estadual por CNPJ — SINTEGRA Brasil',
+    'API pública e gratuita para consultar a Inscrição Estadual (IE) e dados de empresas por CNPJ. JSON, CORS habilitado.',
+    'API pública de consulta por CNPJ',
+    inner,
+    'API'
+  );
+}
+
 module.exports = {
   SITE_URL,
   UFS,
@@ -683,6 +748,7 @@ module.exports = {
   GUIDES,
   CAPITAIS,
   ATIVIDADES,
+  renderApiDocs,
   maskCnpj,
   renderStatePage,
   renderCnpjPage,

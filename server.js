@@ -319,6 +319,45 @@ function counterInc() {
 }
 
 // ---------------------------------------------------------------------------
+// API pública: CORS, rate limit por IP, IP do cliente
+// ---------------------------------------------------------------------------
+
+function clientIp(req) {
+  const xff = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  return xff || (req.socket && req.socket.remoteAddress) || 'unknown';
+}
+
+function setCors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+const rlHits = new Map(); // ip -> [timestamps]
+const RL_LIMIT = 30; // req por janela
+const RL_WINDOW = 60000; // 60s
+
+function rateLimitOk(ip) {
+  const now = Date.now();
+  const arr = (rlHits.get(ip) || []).filter((t) => now - t < RL_WINDOW);
+  if (arr.length >= RL_LIMIT) {
+    rlHits.set(ip, arr);
+    return false;
+  }
+  arr.push(now);
+  rlHits.set(ip, arr);
+  if (rlHits.size > 5000) rlHits.clear(); // limpeza simples
+  return true;
+}
+
+/** Remove dados pessoais (QSA) da resposta pública da API. */
+function publicView(data) {
+  const out = Object.assign({}, data);
+  delete out.socios;
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Servidor HTTP
 // ---------------------------------------------------------------------------
 
@@ -382,6 +421,32 @@ const server = http.createServer(async (req, res) => {
   const urlObj = new URL(req.url, `http://${req.headers.host}`);
   const pathname = decodeURIComponent(urlObj.pathname);
 
+  // Preflight CORS para a API pública
+  if (req.method === 'OPTIONS' && pathname.startsWith('/api/')) {
+    setCors(res);
+    res.writeHead(204);
+    return res.end();
+  }
+
+  // API PÚBLICA versionada: GET /api/v1/cnpj/:cnpj  (CORS + rate limit)
+  let apiM = pathname.match(/^\/api\/v1\/cnpj\/([0-9.\-/]+)\/?$/);
+  if (req.method === 'GET' && apiM) {
+    setCors(res);
+    const cnpj = onlyDigits(apiM[1]);
+    if (!isValidCnpj(cnpj)) return sendJson(res, 400, { erro: 'CNPJ inválido. Informe 14 dígitos válidos.' });
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
+    }
+    try {
+      const data = await getCnpjData(cnpj);
+      counterInc();
+      return sendJson(res, 200, publicView(data));
+    } catch (e) {
+      return sendJson(res, e.status || 500, { erro: e.message || 'Erro interno.' });
+    }
+  }
+
   // API: GET /api/consulta?cnpj=...
   if (req.method === 'GET' && pathname === '/api/consulta') {
     const cnpj = onlyDigits(urlObj.searchParams.get('cnpj'));
@@ -407,6 +472,7 @@ const server = http.createServer(async (req, res) => {
       const urls = [
         { loc: `${seo.SITE_URL}/`, priority: '1.0', lastmod: new Date().toISOString().slice(0, 10) },
         { loc: `${seo.SITE_URL}/validar-inscricao-estadual`, priority: '0.7' },
+        { loc: `${seo.SITE_URL}/api`, priority: '0.6' },
         { loc: `${seo.SITE_URL}/atividades`, priority: '0.6' },
         { loc: `${seo.SITE_URL}/guias`, priority: '0.6' },
         { loc: `${seo.SITE_URL}/incorporar`, priority: '0.5' },
@@ -480,6 +546,11 @@ const server = http.createServer(async (req, res) => {
     // Validador de IE
     if (pathname === '/validar-inscricao-estadual' || pathname === '/validar-inscricao-estadual/') {
       return sendHtml(res, 200, seo.renderValidador(), isHead);
+    }
+
+    // Documentação da API pública
+    if (pathname === '/api' || pathname === '/api/' || pathname === '/api/docs') {
+      return sendHtml(res, 200, seo.renderApiDocs(), isHead);
     }
 
     // Widget e incorporação
