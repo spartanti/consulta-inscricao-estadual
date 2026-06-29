@@ -21,17 +21,8 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const DATA_DIR = path.join(__dirname, 'data');
 const CACHE_DIR = path.join(DATA_DIR, 'cnpj');
 
-// Garante o diretorio de dados (no volume persistente).
+// Garante o diretorio de dados (no volume persistente, usado pelo contador).
 fs.mkdirSync(CACHE_DIR, { recursive: true });
-
-// Inicializa o banco SQLite e migra o cache antigo (JSON) uma única vez.
-db.init(path.join(DATA_DIR, 'empresas.db'));
-try {
-  const migrated = db.migrateFromFiles(CACHE_DIR);
-  if (migrated > 0) console.log(`Migradas ${migrated} consultas do cache JSON para o SQLite.`);
-} catch (e) {
-  console.error('Falha na migração para SQLite:', e.message);
-}
 
 // ---------------------------------------------------------------------------
 // Utilitarios de CNPJ
@@ -247,23 +238,30 @@ function buildResult(data) {
 // Cache em disco das consultas (alimenta as paginas /cnpj e o sitemap)
 // ---------------------------------------------------------------------------
 
-/** Consulta unificada: usa o banco (cache); senao busca na API, monta e salva. */
+/**
+ * Consulta com enriquecimento:
+ *  - se a linha ja foi enriquecida (tem IE), devolve do banco (cache);
+ *  - senao busca na API, monta o payload completo (com IE) e enriquece;
+ *  - se a API falhar mas existir base (Receita), devolve a base.
+ */
 async function getCnpjData(cnpj) {
-  const cached = db.getCnpj(cnpj);
-  if (cached) return cached;
-  const raw = await fetchCnpj(cnpj);
-  const data = buildResult(raw);
-  try { db.saveCnpj(cnpj, data); } catch (e) { /* best-effort */ }
-  return data;
+  let row = null;
+  try { row = await db.getRow(cnpj); } catch (e) { /* banco indisponivel */ }
+  if (row && row.enriquecido_em) return row.data;
+  try {
+    const raw = await fetchCnpj(cnpj);
+    const data = buildResult(raw);
+    try { await db.saveEnriched(cnpj, data); } catch (e) { /* best-effort */ }
+    return data;
+  } catch (e) {
+    if (row && row.data) return row.data; // fallback: base sem IE
+    throw e;
+  }
 }
 
-/** Lista as consultas mais recentes (do banco). */
-function listRecent(limit = 50) {
-  try {
-    return db.listRecent(limit);
-  } catch (e) {
-    return [];
-  }
+/** Lista as consultas recentes (enriquecidas) do banco. */
+async function listRecent(limit = 50) {
+  try { return await db.listRecent(limit); } catch (e) { return []; }
 }
 
 // ---------------------------------------------------------------------------
@@ -444,6 +442,7 @@ const server = http.createServer(async (req, res) => {
   if (isGet) {
     // Sitemap dinamico (home + estados + guias + consultas + CNPJs cacheados)
     if (pathname === '/sitemap.xml') {
+      const recent = await listRecent(5000);
       const urls = [
         { loc: `${seo.SITE_URL}/`, priority: '1.0', lastmod: new Date().toISOString().slice(0, 10) },
         { loc: `${seo.SITE_URL}/validar-inscricao-estadual`, priority: '0.7' },
@@ -460,7 +459,7 @@ const server = http.createServer(async (req, res) => {
         ...seo.CAPITAIS.map((c) => ({ loc: `${seo.SITE_URL}/cidade/${c.slug}`, priority: '0.6' })),
         ...seo.ATIVIDADES.map((a) => ({ loc: `${seo.SITE_URL}/atividade/${a.slug}`, priority: '0.6' })),
         ...seo.GUIDES.map((g) => ({ loc: `${seo.SITE_URL}/guias/${g.slug}`, priority: '0.6' })),
-        ...listRecent(5000).map((c) => ({ loc: `${seo.SITE_URL}/cnpj/${c.cnpj}`, priority: '0.5' })),
+        ...recent.map((c) => ({ loc: `${seo.SITE_URL}/cnpj/${c.cnpj}`, priority: '0.5' })),
       ];
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
       return res.end(isHead ? undefined : seo.buildSitemapXml(urls));
@@ -498,7 +497,7 @@ const server = http.createServer(async (req, res) => {
 
     // Consultas recentes
     if (pathname === '/consultas' || pathname === '/consultas/') {
-      return sendHtml(res, 200, seo.renderConsultas(listRecent(100)), isHead);
+      return sendHtml(res, 200, seo.renderConsultas(await listRecent(100)), isHead);
     }
 
     // Cidades (capitais)
@@ -556,6 +555,15 @@ const server = http.createServer(async (req, res) => {
   res.end('Metodo nao permitido');
 });
 
-server.listen(PORT, () => {
-  console.log(`Consulta IE-ES rodando em http://localhost:${PORT}`);
-});
+(async () => {
+  try {
+    await db.init(process.env.DATABASE_URL);
+    console.log('Storage: PostgreSQL conectado.');
+  } catch (e) {
+    // App continua no ar: consultas ainda funcionam via API (sem persistir).
+    console.error('PostgreSQL indisponível (seguindo sem persistência):', e.message);
+  }
+  server.listen(PORT, () => {
+    console.log(`Consulta IE rodando em http://localhost:${PORT}`);
+  });
+})();

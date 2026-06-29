@@ -1,136 +1,150 @@
 'use strict';
 
 /**
- * Armazenamento das consultas em SQLite (módulo nativo node:sqlite).
- * Guarda o JSON completo de cada empresa + colunas indexadas (uf, municipio,
- * cnae) para permitir, no futuro, busca por CNAE filtrando por estado/município.
+ * Armazenamento em PostgreSQL.
  *
- * Sem dependências externas.
+ * Modelo de enriquecimento:
+ *  - A base (dados abertos da Receita) popula todas as empresas com os campos
+ *    de busca (uf, municipio, cnae, situacao) — sem Inscricao Estadual.
+ *  - A cada CONSULTA, a linha e enriquecida via API (IE + situacao fresca):
+ *    grava o payload completo em "data" e marca "enriquecido_em".
+ *  - A busca por CNAE/UF/municipio roda sobre a base inteira.
  */
 
-const { DatabaseSync } = require('node:sqlite');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
 
-let db = null;
+let pool = null;
 
-function init(dbPath) {
-  db = new DatabaseSync(dbPath);
-  db.exec(`
+function makeSsl(connStr) {
+  // Conexao interna da Railway nao usa SSL; conexao publica (proxy) usa.
+  if (!connStr || connStr.includes('railway.internal')) return false;
+  return { rejectUnauthorized: false };
+}
+
+async function init(connStr) {
+  if (!connStr) throw new Error('DATABASE_URL nao definido.');
+  pool = new Pool({ connectionString: connStr, ssl: makeSsl(connStr), max: 10 });
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS empresas (
-      cnpj TEXT PRIMARY KEY,
-      razao_social TEXT,
-      nome_fantasia TEXT,
-      uf TEXT,
-      municipio TEXT,
+      cnpj               TEXT PRIMARY KEY,
+      razao_social       TEXT,
+      nome_fantasia      TEXT,
+      uf                 TEXT,
+      municipio          TEXT,
+      cnae_codigo        TEXT,
+      cnae_descricao     TEXT,
       situacao_cadastral TEXT,
-      cnae_codigo TEXT,
-      cnae_descricao TEXT,
-      data TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      data               JSONB NOT NULL,
+      enriquecido_em     TIMESTAMPTZ,
+      updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS idx_empresas_uf ON empresas(uf);
-    CREATE INDEX IF NOT EXISTS idx_empresas_municipio ON empresas(municipio);
-    CREATE INDEX IF NOT EXISTS idx_empresas_cnae ON empresas(cnae_codigo);
-    CREATE INDEX IF NOT EXISTS idx_empresas_updated ON empresas(updated_at);
   `);
-  return db;
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_uf ON empresas(uf);');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_municipio ON empresas(municipio);');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_cnae ON empresas(cnae_codigo);');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_updated ON empresas(updated_at DESC);');
+  return pool;
 }
 
-function getCnpj(cnpj) {
-  const row = db.prepare('SELECT data FROM empresas WHERE cnpj = ?').get(cnpj);
-  if (!row) return null;
-  try {
-    return JSON.parse(row.data);
-  } catch (e) {
-    return null;
-  }
+/** Retorna { data, enriquecido_em } ou null. */
+async function getRow(cnpj) {
+  const r = await pool.query('SELECT data, enriquecido_em FROM empresas WHERE cnpj = $1', [cnpj]);
+  return r.rows[0] || null;
 }
 
-function saveCnpj(cnpj, data) {
+async function getCnpj(cnpj) {
+  const row = await getRow(cnpj);
+  return row ? row.data : null;
+}
+
+function cols(data) {
   const cnae = data.atividade_principal || {};
-  db.prepare(
-    `INSERT INTO empresas
-       (cnpj, razao_social, nome_fantasia, uf, municipio, situacao_cadastral, cnae_codigo, cnae_descricao, data, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(cnpj) DO UPDATE SET
-       razao_social=excluded.razao_social,
-       nome_fantasia=excluded.nome_fantasia,
-       uf=excluded.uf,
-       municipio=excluded.municipio,
-       situacao_cadastral=excluded.situacao_cadastral,
-       cnae_codigo=excluded.cnae_codigo,
-       cnae_descricao=excluded.cnae_descricao,
-       data=excluded.data,
-       updated_at=excluded.updated_at`
-  ).run(
-    cnpj,
+  return [
     data.razao_social || null,
     data.nome_fantasia || null,
     data.uf || null,
     data.municipio || null,
-    data.situacao_cadastral || null,
     cnae.codigo || null,
     cnae.descricao || null,
-    JSON.stringify(data),
-    new Date().toISOString()
+    data.situacao_cadastral || null,
+  ];
+}
+
+/** Consulta (enriquecimento): grava payload completo (com IE) e marca enriquecido. */
+async function saveEnriched(cnpj, data) {
+  await pool.query(
+    `INSERT INTO empresas
+       (cnpj, razao_social, nome_fantasia, uf, municipio, cnae_codigo, cnae_descricao, situacao_cadastral, data, enriquecido_em, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now(), now())
+     ON CONFLICT (cnpj) DO UPDATE SET
+       razao_social=EXCLUDED.razao_social,
+       nome_fantasia=EXCLUDED.nome_fantasia,
+       uf=EXCLUDED.uf,
+       municipio=EXCLUDED.municipio,
+       cnae_codigo=EXCLUDED.cnae_codigo,
+       cnae_descricao=EXCLUDED.cnae_descricao,
+       situacao_cadastral=EXCLUDED.situacao_cadastral,
+       data=EXCLUDED.data,
+       enriquecido_em=now(),
+       updated_at=now()`,
+    [cnpj, ...cols(data), JSON.stringify(data)]
   );
 }
 
-function listRecent(limit = 50) {
-  return db
-    .prepare('SELECT cnpj, razao_social AS razao, uf FROM empresas ORDER BY updated_at DESC LIMIT ?')
-    .all(limit);
-}
-
-function count() {
-  return db.prepare('SELECT COUNT(*) AS c FROM empresas').get().c;
-}
-
 /**
- * Busca filtrada (pronta para a futura oferta de consulta por CNAE/UF/município).
- * filtros: { cnae, uf, municipio, q, limit, offset }
+ * Importacao da base (Receita): grava dados base SEM sobrescrever o
+ * enriquecimento de linhas ja consultadas (preserva IE).
  */
-function search(f = {}) {
+async function upsertBase(cnpj, data) {
+  await pool.query(
+    `INSERT INTO empresas
+       (cnpj, razao_social, nome_fantasia, uf, municipio, cnae_codigo, cnae_descricao, situacao_cadastral, data, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, now())
+     ON CONFLICT (cnpj) DO UPDATE SET
+       razao_social=EXCLUDED.razao_social,
+       nome_fantasia=EXCLUDED.nome_fantasia,
+       uf=EXCLUDED.uf,
+       municipio=EXCLUDED.municipio,
+       cnae_codigo=EXCLUDED.cnae_codigo,
+       cnae_descricao=EXCLUDED.cnae_descricao,
+       situacao_cadastral=EXCLUDED.situacao_cadastral,
+       data=CASE WHEN empresas.enriquecido_em IS NULL THEN EXCLUDED.data ELSE empresas.data END,
+       updated_at=now()`,
+    [cnpj, ...cols(data), JSON.stringify(data)]
+  );
+}
+
+async function listRecent(limit = 50) {
+  const r = await pool.query(
+    'SELECT cnpj, razao_social AS razao, uf FROM empresas WHERE enriquecido_em IS NOT NULL ORDER BY updated_at DESC LIMIT $1',
+    [Math.min(limit, 5000)]
+  );
+  return r.rows;
+}
+
+async function count() {
+  const r = await pool.query('SELECT COUNT(*)::int AS c FROM empresas');
+  return r.rows[0].c;
+}
+
+/** Busca filtrada (consulta por CNAE/UF/municipio). */
+async function search(f = {}) {
   const where = [];
   const params = [];
-  if (f.uf) { where.push('uf = ?'); params.push(String(f.uf).toUpperCase()); }
-  if (f.municipio) { where.push('LOWER(municipio) = LOWER(?)'); params.push(f.municipio); }
-  if (f.cnae) { where.push('cnae_codigo LIKE ?'); params.push(String(f.cnae) + '%'); }
-  if (f.q) { where.push('(razao_social LIKE ? OR nome_fantasia LIKE ?)'); params.push('%' + f.q + '%', '%' + f.q + '%'); }
+  let i = 1;
+  if (f.uf) { where.push(`uf = $${i++}`); params.push(String(f.uf).toUpperCase()); }
+  if (f.municipio) { where.push(`LOWER(municipio) = LOWER($${i++})`); params.push(f.municipio); }
+  if (f.cnae) { where.push(`cnae_codigo LIKE $${i++}`); params.push(String(f.cnae) + '%'); }
+  if (f.q) { where.push(`(razao_social ILIKE $${i} OR nome_fantasia ILIKE $${i})`); params.push('%' + f.q + '%'); i++; }
+  const limit = Math.min(f.limit || 50, 200);
+  const offset = f.offset || 0;
   const sql =
     'SELECT cnpj, razao_social, nome_fantasia, uf, municipio, cnae_codigo, cnae_descricao FROM empresas' +
     (where.length ? ' WHERE ' + where.join(' AND ') : '') +
-    ' ORDER BY updated_at DESC LIMIT ? OFFSET ?';
-  params.push(Math.min(f.limit || 50, 200), f.offset || 0);
-  return db.prepare(sql).all(...params);
+    ` ORDER BY razao_social LIMIT $${i++} OFFSET $${i++}`;
+  params.push(limit, offset);
+  const r = await pool.query(sql, params);
+  return r.rows;
 }
 
-/** Importa, uma única vez, os arquivos JSON antigos (data/cnpj/*.json). */
-function migrateFromFiles(dir) {
-  let files;
-  try {
-    files = fs.readdirSync(dir).filter((x) => x.endsWith('.json'));
-  } catch (e) {
-    return 0;
-  }
-  let migrated = 0;
-  for (const f of files) {
-    const cnpj = f.replace(/\.json$/, '');
-    const exists = db.prepare('SELECT 1 FROM empresas WHERE cnpj = ?').get(cnpj);
-    if (exists) continue;
-    try {
-      const raw = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-      const data = raw.data || raw;
-      if (data && data.cnpj) {
-        saveCnpj(cnpj, data);
-        migrated++;
-      }
-    } catch (e) {
-      /* ignora arquivo corrompido */
-    }
-  }
-  return migrated;
-}
-
-module.exports = { init, getCnpj, saveCnpj, listRecent, count, search, migrateFromFiles };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, listRecent, count, search };
