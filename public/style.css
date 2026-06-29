@@ -521,6 +521,11 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 .brand-link { color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; font-size: 20px; }
 .brand-link .badge { font-size: 13px; }
 
+/* Cabeçalho das páginas SSR — igual à home (centralizado, badge + título) */
+.brand-home { text-decoration: none; color: #fff; display: inline-block; }
+.brand-home .brand-title { display: block; font-size: 24px; font-weight: 700; margin: 10px 0 2px; }
+.brand-home:hover .brand-title { text-decoration: underline; }
+
 .footer-links { font-size: 14px; margin: 0 0 12px; }
 .footer-links a { color: var(--azul-claro); text-decoration: none; }
 

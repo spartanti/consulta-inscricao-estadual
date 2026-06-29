@@ -158,14 +158,18 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css?v=2" />
+  <link rel="stylesheet" href="/style.css?v=3" />
   ${bc}
   ${gaSnippet()}
 </head>
 <body>
   <header class="topbar">
     <div class="container">
-      <a href="/" class="brand-link"><span class="badge">BR</span> <strong>SINTEGRA Brasil</strong></a>
+      <a href="/" class="brand-home">
+        <span class="badge">BR</span>
+        <span class="brand-title">Consulta de Inscrição Estadual</span>
+      </a>
+      <p class="subtitle">SINTEGRA Brasil · empresas de todo o Brasil</p>
     </div>
   </header>
   <main class="container">
