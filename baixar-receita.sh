@@ -6,8 +6,11 @@
 #   MODO=amostra bash baixar-receita.sh   # baixa só o necessário p/ validar (~1 GB)
 set -e
 
-MES="${MES:-2025-12}"
-BASE="https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj/${MES}"
+MES="${MES:-2026-06}"
+# A RFB migrou os dados abertos para um compartilhamento Nextcloud (WebDAV publico).
+# O antigo caminho /dados/cnpj/dados_abertos_cnpj/ nao existe mais (retorna 404).
+SHARE="${SHARE:-YggdBLfdninEJX9}"
+BASE="https://arquivos.receitafederal.gov.br/public.php/dav/files/${SHARE}/${MES}"
 DEST="${DEST:-$HOME/receita-dados/${MES}}"
 MODO="${MODO:-completo}"
 

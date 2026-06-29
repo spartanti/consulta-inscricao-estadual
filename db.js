@@ -114,6 +114,41 @@ async function upsertBase(cnpj, data) {
   );
 }
 
+/** Upsert em lote (importação): grava vários registros base de uma vez. */
+async function upsertBaseBatch(rows) {
+  if (!rows.length) return;
+  // dedupe por cnpj dentro do lote (ON CONFLICT nao pode afetar a linha 2x)
+  const seen = new Set();
+  const uniq = [];
+  for (const d of rows) {
+    if (/^\d{14}$/.test(d.cnpj) && !seen.has(d.cnpj)) { seen.add(d.cnpj); uniq.push(d); }
+  }
+  if (!uniq.length) return;
+  const tuples = [];
+  const params = [];
+  uniq.forEach((d, i) => {
+    const b = i * 9;
+    tuples.push(`($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7},$${b + 8},$${b + 9},now())`);
+    params.push(d.cnpj, ...cols(d), JSON.stringify(d));
+  });
+  await pool.query(
+    `INSERT INTO empresas
+       (cnpj, razao_social, nome_fantasia, uf, municipio, cnae_codigo, cnae_descricao, situacao_cadastral, data, updated_at)
+     VALUES ${tuples.join(',')}
+     ON CONFLICT (cnpj) DO UPDATE SET
+       razao_social=EXCLUDED.razao_social,
+       nome_fantasia=EXCLUDED.nome_fantasia,
+       uf=EXCLUDED.uf,
+       municipio=EXCLUDED.municipio,
+       cnae_codigo=EXCLUDED.cnae_codigo,
+       cnae_descricao=EXCLUDED.cnae_descricao,
+       situacao_cadastral=EXCLUDED.situacao_cadastral,
+       data=CASE WHEN empresas.enriquecido_em IS NULL THEN EXCLUDED.data ELSE empresas.data END,
+       updated_at=now()`,
+    params
+  );
+}
+
 async function listRecent(limit = 50) {
   const r = await pool.query(
     'SELECT cnpj, razao_social AS razao, uf FROM empresas WHERE enriquecido_em IS NOT NULL ORDER BY updated_at DESC LIMIT $1',
@@ -147,4 +182,8 @@ async function search(f = {}) {
   return r.rows;
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, listRecent, count, search };
+async function close() {
+  if (pool) await pool.end();
+}
+
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, search, close };

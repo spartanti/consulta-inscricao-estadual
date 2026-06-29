@@ -31,6 +31,8 @@ const MES = process.env.MES || '';
 const LOCAL_DIR = process.env.LOCAL_DIR || ''; // se definido, lê os .zip locais (sem baixar)
 const UF = (process.env.UF || '').toUpperCase();
 const LIMIT = parseInt(process.env.LIMIT || '0', 10) || 0;
+const EMP_MAX = parseInt(process.env.EMP_MAX || '0', 10) || 0; // limita o mapa de Empresas (RAM); 0 = todas
+const BATCH = parseInt(process.env.BATCH || '1000', 10) || 1000; // tamanho do lote de upsert
 const PARTS = (process.env.PARTS || '0,1,2,3,4,5,6,7,8,9').split(',').map((s) => s.trim()).filter(Boolean);
 
 const SITUACAO = { '01': 'Nula', '02': 'Ativa', '03': 'Suspensa', '04': 'Inapta', '08': 'Baixada' };
@@ -123,7 +125,16 @@ function streamZipCsv(cmd, onLine) {
     rl.on('line', (line) => {
       if (stopped || !line) return;
       const r = onLine(parseCsvLine(line));
-      if (r === false) { stopped = true; rl.close(); sh.kill('SIGKILL'); }
+      if (r === false) {
+        stopped = true; rl.close(); sh.kill('SIGKILL');
+      } else if (r && typeof r.then === 'function') {
+        // onLine pediu flush assíncrono -> aplica backpressure
+        rl.pause();
+        r.then((rr) => {
+          if (rr === false) { stopped = true; rl.close(); sh.kill('SIGKILL'); }
+          else rl.resume();
+        }).catch(() => rl.resume());
+      }
     });
     rl.on('close', resolve);
     sh.on('error', reject);
@@ -166,33 +177,33 @@ async function main() {
         porte: PORTE[f[5]] || null,
         capital: f[4] ? Number(String(f[4]).replace(',', '.')).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : null,
       });
+      if (EMP_MAX && emp.size >= EMP_MAX) return false; // para o stream (limite de RAM)
     });
+    console.log(`[parte ${k}] empresas no mapa: ${emp.size}`);
 
-    // 2) estabelecimentos da parte k -> upsert
+    // 2) estabelecimentos da parte k -> upsert em lote (backpressure)
     console.log(`[parte ${k}] processando Estabelecimentos${k}.zip...`);
     let batch = [];
     const flush = async () => {
-      for (const d of batch) { try { await db.upsertBase(d.cnpj, d); } catch (e) {} }
-      totalUpsert += batch.length;
-      batch = [];
+      if (!batch.length) return;
+      const b = batch; batch = [];
+      try { await db.upsertBaseBatch(b); } catch (e) { console.error('  erro no lote:', e.message); }
+      totalUpsert += b.length;
+      if (totalUpsert % 50000 < BATCH) console.log(`  ... ${totalUpsert} gravados`);
     };
-    let stop = false;
     await streamZipCsv(srcCmd(`Estabelecimentos${k}.zip`), (f) => {
-      if (stop) return false;
       if (UF && f[19] !== UF) return;
       const d = buildEstabData(f, emp.get(f[0]), muniMap, cnaeMap);
       if (!/^\d{14}$/.test(d.cnpj)) return;
       batch.push(d);
-      // Obs.: coleta-e-grava ao final do stream. Para Brasil inteiro sem filtro,
-      // rode por UF (UF=..) ou em máquina com RAM adequada.
-      if (LIMIT && totalUpsert + batch.length >= LIMIT) { stop = true; return false; }
-      return true;
+      if (LIMIT && totalUpsert + batch.length >= LIMIT) return flush().then(() => false);
+      if (batch.length >= BATCH) return flush();
     });
     await flush();
     console.log(`[parte ${k}] total upserts acumulado: ${totalUpsert}`);
   }
   console.log(`Concluído. Empresas no banco: ${await db.count()}`);
-  process.exit(0);
+  if (db.close) await db.close();
 }
 
 if (require.main === module) {
