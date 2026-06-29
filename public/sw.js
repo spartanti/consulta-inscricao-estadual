@@ -1,5 +1,6 @@
-/* Service worker básico: cache de assets estáticos + network-first para HTML. */
-const CACHE = 'sintegrabrasil-v1';
+/* Service worker: network-first (sempre busca a versão atual quando online;
+ * usa cache só como fallback offline). Evita servir assets desatualizados. */
+const CACHE = 'sintegrabrasil-v2';
 const ASSETS = ['/', '/style.css', '/app.js', '/favicon.svg', '/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
@@ -16,15 +17,19 @@ self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Nunca cachear a API nem páginas dinâmicas de consulta.
+  // Nunca cachear API nem páginas dinâmicas de consulta.
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/cnpj/')) return;
 
-  const accept = req.headers.get('accept') || '';
-  if (accept.includes('text/html')) {
-    // network-first p/ HTML
-    e.respondWith(fetch(req).catch(() => caches.match(req).then((r) => r || caches.match('/'))));
-  } else {
-    // cache-first p/ assets
-    e.respondWith(caches.match(req).then((r) => r || fetch(req)));
-  }
+  // network-first: tenta a rede; em sucesso atualiza o cache; offline -> cache.
+  e.respondWith(
+    fetch(req)
+      .then((resp) => {
+        if (resp && resp.status === 200 && url.origin === self.location.origin) {
+          const copy = resp.clone();
+          caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return resp;
+      })
+      .catch(() => caches.match(req).then((r) => r || caches.match('/')))
+  );
 });

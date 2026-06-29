@@ -158,7 +158,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css" />
+  <link rel="stylesheet" href="/style.css?v=2" />
   ${bc}
   ${gaSnippet()}
 </head>
