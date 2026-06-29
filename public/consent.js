@@ -5,6 +5,11 @@
   var GA = 'G-Z3HHB66R1Y';
   var KEY = 'sb_consent'; // 'accepted' | 'rejected'
 
+  // ⚠️ MODO TESTE (temporário): quando true, o Analytics coleta de TODOS os
+  // visitantes, sem pedir consentimento (reduz a conformidade LGPD).
+  // Volte para false para reativar o consentimento (opt-in).
+  var FORCE_ANALYTICS = true;
+
   function get() { try { return localStorage.getItem(KEY); } catch (e) { return null; } }
   function set(v) { try { localStorage.setItem(KEY, v); } catch (e) {} }
 
@@ -52,6 +57,12 @@
     removeBanner();
     showBanner();
   };
+
+  if (FORCE_ANALYTICS) {
+    // Modo teste: coleta sempre, sem banner.
+    loadGA();
+    return;
+  }
 
   var c = get();
   if (c === 'accepted') {

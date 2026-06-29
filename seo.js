@@ -116,7 +116,7 @@ function maskCnpj(cnpj) {
 
 function gaSnippet() {
   // Analytics só carrega após consentimento (ver public/consent.js) — LGPD.
-  return '<script src="/consent.js?v=1" defer></script>';
+  return '<script src="/consent.js?v=2" defer></script>';
 }
 
 /** Barra de links por estado (rodape) — linkagem interna p/ rastreamento. */
