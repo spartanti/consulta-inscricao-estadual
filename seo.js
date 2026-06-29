@@ -115,7 +115,7 @@ function maskCnpj(cnpj) {
 }
 
 function gaSnippet() {
-  const id = process.env.GA_MEASUREMENT_ID;
+  const id = process.env.GA_MEASUREMENT_ID || 'G-Z3HHB66R1Y';
   if (!id) return '';
   return `
   <script async src="https://www.googletagmanager.com/gtag/js?id=${escapeHtml(id)}"></script>

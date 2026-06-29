@@ -7,6 +7,16 @@ const statusEl = document.getElementById('status');
 const resultEl = document.getElementById('result');
 const ufFilter = document.getElementById('uf-filter');
 
+// Rastreia clique no banner do TagPlus (conversão de afiliado no GA4).
+const adbanner = document.querySelector('.adbanner');
+if (adbanner) {
+  adbanner.addEventListener('click', () => {
+    if (window.gtag) {
+      gtag('event', 'click_banner_tagplus', { event_category: 'afiliado', event_label: 'tagplus_checkout' });
+    }
+  });
+}
+
 const UFS = [
   'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG',
   'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
@@ -249,6 +259,9 @@ form.addEventListener('submit', async (e) => {
     }
     clearStatus();
     renderResult(data);
+    if (window.gtag) {
+      gtag('event', 'consulta_cnpj', { event_category: 'consulta', tem_ie: (data.inscricoes_estaduais || []).length > 0 });
+    }
   } catch (err) {
     showStatus('error', 'Erro de conexão. Tente novamente.');
   } finally {
