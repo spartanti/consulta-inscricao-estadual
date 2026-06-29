@@ -115,16 +115,8 @@ function maskCnpj(cnpj) {
 }
 
 function gaSnippet() {
-  const id = process.env.GA_MEASUREMENT_ID || 'G-Z3HHB66R1Y';
-  if (!id) return '';
-  return `
-  <script async src="https://www.googletagmanager.com/gtag/js?id=${escapeHtml(id)}"></script>
-  <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-    gtag('config', '${escapeHtml(id)}');
-  </script>`;
+  // Analytics só carrega após consentimento (ver public/consent.js) — LGPD.
+  return '<script src="/consent.js?v=1" defer></script>';
 }
 
 /** Barra de links por estado (rodape) — linkagem interna p/ rastreamento. */
@@ -158,7 +150,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css?v=3" />
+  <link rel="stylesheet" href="/style.css?v=4" />
   ${bc}
   ${gaSnippet()}
 </head>
@@ -568,36 +560,129 @@ function renderContato() {
 
 function renderPrivacidade() {
   const inner = `
-    <p>Esta Política de Privacidade descreve como o SINTEGRA Brasil trata informações ao usar nosso site.</p>
-    <h2>Dados consultados</h2>
-    <p>As consultas exibem dados <strong>públicos</strong> de empresas (CNPJ), obtidos de bases públicas
-    (Receita Federal e SEFAZ). Não exibimos dados pessoais de sócios em páginas indexáveis.</p>
-    <h2>Cookies e analytics</h2>
-    <p>Utilizamos o Google Analytics para medir o uso do site de forma agregada. Esses serviços podem usar
-    cookies. Você pode bloquear cookies nas configurações do seu navegador.</p>
-    <h2>Dados que você fornece</h2>
-    <p>Não exigimos cadastro. O CNPJ digitado é usado apenas para realizar a consulta.</p>
-    <h2>Remoção de dados (LGPD)</h2>
-    <p>Pedidos de remoção ou correção podem ser feitos pelos canais da <a href="/contato">página de contato</a>.</p>
-    <h2>Responsável</h2>
-    <p>O tratamento é realizado pela Spartan TI. Este é um serviço independente, sem vínculo com órgãos públicos.</p>`;
-  return contentPage('/privacidade', 'Política de Privacidade — SINTEGRA Brasil', 'Política de Privacidade e tratamento de dados (LGPD) do SINTEGRA Brasil.', 'Política de Privacidade', inner, 'Privacidade');
+    <p class="muted">Última atualização: 29/06/2026 · Em conformidade com a Lei nº 13.709/2018 (LGPD).</p>
+    <p>Esta Política de Privacidade explica como o <strong>SINTEGRA Brasil</strong> coleta, usa, compartilha e
+    protege informações, e quais são os seus direitos como titular de dados.</p>
+
+    <h2>1. Controlador dos dados</h2>
+    <p>O controlador é a <strong>Spartan TI</strong>
+    (<a href="https://www.spartanti.com.br" target="_blank" rel="noopener">spartanti.com.br</a>). Para assuntos
+    de privacidade e para falar com o Encarregado (DPO), use a <a href="/contato">página de Contato</a>.</p>
+
+    <h2>2. Dados que tratamos</h2>
+    <ul>
+      <li><strong>Dados públicos de empresas:</strong> CNPJ, razão social, nome fantasia, situação cadastral,
+      endereço, atividade (CNAE) e Inscrição Estadual — obtidos de <strong>fontes públicas</strong>
+      (Receita Federal / SEFAZ e APIs que as disponibilizam). Não publicamos dados pessoais de sócios
+      (QSA) em páginas indexáveis.</li>
+      <li><strong>Dados de navegação:</strong> de forma agregada e anonimizada, via Google Analytics
+      (somente com o seu consentimento), para medir audiência.</li>
+      <li><strong>CNPJ digitado:</strong> usado para realizar a consulta. Não exigimos cadastro nem coletamos
+      seu nome, e-mail ou CPF.</li>
+    </ul>
+    <p>Não tratamos dados pessoais sensíveis e não realizamos decisões automatizadas que afetem titulares.</p>
+
+    <h2>3. Bases legais (art. 7º da LGPD)</h2>
+    <ul>
+      <li><strong>Dados manifestamente públicos</strong> de empresas e cumprimento de finalidade legítima
+      (art. 7º, §3º e art. 7º, IX).</li>
+      <li><strong>Consentimento</strong> (art. 7º, I) para cookies de análise (Google Analytics).</li>
+    </ul>
+
+    <h2>4. Finalidades</h2>
+    <p>Permitir a consulta de Inscrição Estadual e dados cadastrais; melhorar e manter o serviço; e medir a
+    audiência de forma agregada.</p>
+
+    <h2>5. Cookies</h2>
+    <p>Cookies estritamente necessários ao funcionamento podem ser usados. Cookies de <strong>análise</strong>
+    (Google Analytics) só são ativados após o seu <strong>consentimento</strong> no aviso exibido na primeira
+    visita. Você pode
+    <a href="#" onclick="if(window.gerenciarCookies){gerenciarCookies();}return false;">alterar suas preferências de cookies</a>
+    a qualquer momento.</p>
+
+    <h2>6. Compartilhamento e operadores</h2>
+    <p>Podemos compartilhar dados com prestadores que viabilizam o serviço: <strong>Google</strong> (Analytics),
+    provedor de <strong>hospedagem</strong> (Railway) e <strong>APIs de dados públicos</strong> (ex.: CNPJ.ws).
+    Não vendemos dados pessoais.</p>
+
+    <h2>7. Transferência internacional</h2>
+    <p>Alguns provedores (ex.: Google, hospedagem) podem processar dados em servidores fora do Brasil. Nesses
+    casos, buscamos garantias adequadas conforme a LGPD.</p>
+
+    <h2>8. Retenção</h2>
+    <p>Dados públicos de empresas são mantidos enquanto úteis ao serviço. Métricas de uso são tratadas de forma
+    agregada pelo Google Analytics conforme as políticas dele.</p>
+
+    <h2>9. Seus direitos (art. 18 da LGPD)</h2>
+    <p>Você pode solicitar: confirmação e acesso aos dados; correção; anonimização, bloqueio ou eliminação;
+    portabilidade; informação sobre compartilhamentos; e revogação do consentimento. Para exercer, use a
+    <a href="/contato">página de Contato</a>.</p>
+
+    <h2>10. Remoção de dados de empresa/sócio</h2>
+    <p>Pedidos de remoção ou correção de informações exibidas podem ser feitos pela
+    <a href="/contato">página de Contato</a> e serão avaliados conforme a legislação.</p>
+
+    <h2>11. Segurança</h2>
+    <p>Adotamos medidas técnicas e organizacionais razoáveis para proteger as informações tratadas.</p>
+
+    <h2>12. Alterações</h2>
+    <p>Esta política pode ser atualizada. A data no topo indica a última revisão.</p>
+
+    <p class="muted">Este serviço é independente e não possui vínculo com a Receita Federal, SEFAZ ou órgãos públicos.</p>`;
+  return contentPage('/privacidade', 'Política de Privacidade (LGPD) — SINTEGRA Brasil', 'Política de Privacidade do SINTEGRA Brasil em conformidade com a LGPD: dados tratados, bases legais, cookies, compartilhamento e direitos do titular.', 'Política de Privacidade', inner, 'Privacidade');
 }
 
 function renderTermos() {
   const inner = `
-    <p>Ao usar o SINTEGRA Brasil, você concorda com estes Termos de Uso.</p>
-    <h2>Uso da ferramenta</h2>
-    <p>O serviço é fornecido de forma gratuita e "como está", para fins informativos. Os dados são obtidos
-    de bases públicas e podem conter desatualizações. Para fins oficiais, confirme no SINTEGRA da SEFAZ.</p>
-    <h2>Limitação de responsabilidade</h2>
-    <p>Não nos responsabilizamos por decisões tomadas com base nas informações exibidas. Recomendamos sempre
-    a conferência nas fontes oficiais.</p>
-    <h2>Uso indevido</h2>
-    <p>É proibido o uso automatizado abusivo, a coleta em massa ou qualquer uso que viole a legislação vigente.</p>
-    <h2>Independência</h2>
-    <p>O SINTEGRA Brasil é um serviço independente, sem vínculo com a Receita Federal, SEFAZ ou órgãos públicos.</p>`;
-  return contentPage('/termos', 'Termos de Uso — SINTEGRA Brasil', 'Termos de Uso do SINTEGRA Brasil.', 'Termos de Uso', inner, 'Termos');
+    <p class="muted">Última atualização: 29/06/2026.</p>
+    <p>Ao acessar e utilizar o <strong>SINTEGRA Brasil</strong>, você concorda com estes Termos de Uso. Se não
+    concordar, não utilize o site.</p>
+
+    <h2>1. Objeto</h2>
+    <p>O SINTEGRA Brasil é uma ferramenta gratuita para consulta de Inscrição Estadual e dados cadastrais
+    públicos de empresas a partir do CNPJ, além de busca por atividade (CNAE), estado e município.</p>
+
+    <h2>2. Natureza informativa dos dados</h2>
+    <p>As informações vêm de <strong>fontes públicas</strong> (Receita Federal / SEFAZ e APIs) e têm caráter
+    <strong>meramente informativo</strong>. Podem conter imprecisões ou estar desatualizadas. Para qualquer
+    finalidade oficial, fiscal ou jurídica, confirme nas fontes oficiais (SINTEGRA da SEFAZ do estado).</p>
+
+    <h2>3. Uso permitido</h2>
+    <p>O uso é pessoal e legítimo. É <strong>proibido</strong>: coleta automatizada em massa (scraping) que
+    sobrecarregue o serviço, uso para fins ilícitos, discriminatórios ou que violem a LGPD e demais leis, e
+    qualquer tentativa de comprometer a segurança do site.</p>
+
+    <h2>4. Disponibilidade</h2>
+    <p>O serviço é fornecido "no estado em que se encontra" e "conforme disponível", sem garantia de
+    funcionamento ininterrupto, exatidão ou adequação a um fim específico.</p>
+
+    <h2>5. Limitação de responsabilidade</h2>
+    <p>Não nos responsabilizamos por decisões tomadas com base nas informações exibidas, nem por danos diretos
+    ou indiretos decorrentes do uso. Recomendamos sempre a conferência nas fontes oficiais.</p>
+
+    <h2>6. Publicidade e links de terceiros</h2>
+    <p>O site pode exibir publicidade e links para terceiros (ex.: parceiros). Não nos responsabilizamos por
+    conteúdos, produtos ou políticas de sites externos.</p>
+
+    <h2>7. Propriedade intelectual</h2>
+    <p>A marca, o layout e o software do SINTEGRA Brasil pertencem à Spartan TI. Os dados públicos pertencem às
+    respectivas fontes oficiais.</p>
+
+    <h2>8. Privacidade</h2>
+    <p>O tratamento de dados segue a nossa <a href="/privacidade">Política de Privacidade</a>, em conformidade
+    com a LGPD.</p>
+
+    <h2>9. Independência</h2>
+    <p>O SINTEGRA Brasil é um serviço <strong>independente e privado</strong>, sem vínculo com a Receita Federal,
+    SEFAZ ou qualquer órgão público.</p>
+
+    <h2>10. Lei aplicável e foro</h2>
+    <p>Estes Termos são regidos pelas leis do Brasil. Fica eleito o foro do domicílio do usuário para dirimir
+    eventuais controvérsias, salvo disposição legal em contrário.</p>
+
+    <h2>11. Contato</h2>
+    <p>Dúvidas sobre estes Termos: <a href="/contato">página de Contato</a>.</p>`;
+  return contentPage('/termos', 'Termos de Uso — SINTEGRA Brasil', 'Termos de Uso do SINTEGRA Brasil: natureza informativa dos dados, uso permitido, limitação de responsabilidade e legislação aplicável.', 'Termos de Uso', inner, 'Termos');
 }
 
 // --- Validador de IE ---
