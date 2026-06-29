@@ -420,6 +420,33 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // API PÚBLICA: busca filtrada por CNAE/UF/município/nome
+  if (req.method === 'GET' && pathname === '/api/v1/buscar') {
+    setCors(res);
+    const f = {
+      cnae: (urlObj.searchParams.get('cnae') || '').trim(),
+      uf: (urlObj.searchParams.get('uf') || '').trim(),
+      municipio: (urlObj.searchParams.get('municipio') || '').trim(),
+      q: (urlObj.searchParams.get('q') || '').trim(),
+    };
+    if (!f.cnae && !f.uf && !f.municipio && !f.q) {
+      return sendJson(res, 400, { erro: 'Informe ao menos um filtro (cnae, uf, municipio ou q).' });
+    }
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
+    }
+    const limit = Math.min(parseInt(urlObj.searchParams.get('limit') || '50', 10) || 50, 100);
+    const offset = Math.max(parseInt(urlObj.searchParams.get('offset') || '0', 10) || 0, 0);
+    try {
+      const rows = await db.search({ ...f, limit: limit + 1, offset });
+      const hasMore = rows.length > limit;
+      return sendJson(res, 200, { resultados: rows.slice(0, limit), hasMore, limit, offset });
+    } catch (e) {
+      return sendJson(res, 500, { erro: 'Erro na busca.' });
+    }
+  }
+
   // API: GET /api/consulta?cnpj=...
   if (req.method === 'GET' && pathname === '/api/consulta') {
     const cnpj = onlyDigits(urlObj.searchParams.get('cnpj'));
@@ -445,6 +472,7 @@ const server = http.createServer(async (req, res) => {
       const recent = await listRecent(5000);
       const urls = [
         { loc: `${seo.SITE_URL}/`, priority: '1.0', lastmod: new Date().toISOString().slice(0, 10) },
+        { loc: `${seo.SITE_URL}/busca`, priority: '0.8' },
         { loc: `${seo.SITE_URL}/validar-inscricao-estadual`, priority: '0.7' },
         { loc: `${seo.SITE_URL}/api`, priority: '0.6' },
         { loc: `${seo.SITE_URL}/atividades`, priority: '0.6' },
@@ -520,6 +548,11 @@ const server = http.createServer(async (req, res) => {
     // Validador de IE
     if (pathname === '/validar-inscricao-estadual' || pathname === '/validar-inscricao-estadual/') {
       return sendHtml(res, 200, seo.renderValidador(), isHead);
+    }
+
+    // Busca por CNAE/UF/município
+    if (pathname === '/busca' || pathname === '/busca/') {
+      return sendHtml(res, 200, seo.renderBusca(), isHead);
     }
 
     // Documentação da API pública

@@ -642,3 +642,34 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   margin: 0 0 8px;
 }
 .counter #contador-num { font-variant-numeric: tabular-nums; }
+
+/* === Busca por CNAE/UF/município === */
+.busca-form { display: flex; flex-direction: column; gap: 10px; margin: 14px 0; }
+.busca-form input, .busca-form select {
+  padding: 12px 14px; font-size: 15px; border: 1px solid var(--borda); border-radius: 10px; outline: none;
+}
+.busca-form input:focus, .busca-form select:focus { border-color: var(--azul-claro); }
+.busca-row { display: flex; gap: 10px; }
+.busca-row select { flex: 0 0 130px; }
+.busca-row input { flex: 1; }
+.busca-form button {
+  background: var(--azul); color: #fff; border: 0; border-radius: 10px;
+  padding: 12px 22px; font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.busca-form button:hover { background: var(--azul-claro); }
+.busca-status { font-size: 14px; color: var(--cinza); margin: 6px 0; }
+
+.table-wrap { overflow-x: auto; }
+.busca-table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-top: 8px; }
+.busca-table th, .busca-table td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--borda); vertical-align: top; }
+.busca-table th { color: var(--azul); font-size: 12px; text-transform: uppercase; letter-spacing: 0.4px; }
+.busca-table tr:hover td { background: #f7f9fc; }
+.busca-table a { color: var(--azul-claro); text-decoration: none; font-weight: 600; white-space: nowrap; }
+
+.busca-pager { display: flex; align-items: center; gap: 12px; justify-content: center; margin: 16px 0; }
+
+@media print {
+  .busca-form, .busca-status, .busca-pager, #busca-actions { display: none !important; }
+  .busca-table { font-size: 11px; }
+  .busca-table a { display: none; }
+}

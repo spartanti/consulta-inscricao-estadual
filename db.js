@@ -14,6 +14,7 @@
 const { Pool } = require('pg');
 
 let pool = null;
+let hasUnaccent = false;
 
 function makeSsl(connStr) {
   // Conexao interna da Railway nao usa SSL; conexao publica (proxy) usa.
@@ -43,6 +44,13 @@ async function init(connStr) {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_municipio ON empresas(municipio);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_cnae ON empresas(cnae_codigo);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_updated ON empresas(updated_at DESC);');
+  // unaccent permite busca de município sem depender de acentos.
+  try {
+    await pool.query('CREATE EXTENSION IF NOT EXISTS unaccent');
+    hasUnaccent = true;
+  } catch (e) {
+    hasUnaccent = false;
+  }
   return pool;
 }
 
@@ -167,10 +175,18 @@ async function search(f = {}) {
   const where = [];
   const params = [];
   let i = 1;
+  const ila = (col) => (hasUnaccent ? `unaccent(${col}) ILIKE unaccent($${i})` : `${col} ILIKE $${i}`);
   if (f.uf) { where.push(`uf = $${i++}`); params.push(String(f.uf).toUpperCase()); }
-  if (f.municipio) { where.push(`LOWER(municipio) = LOWER($${i++})`); params.push(f.municipio); }
-  if (f.cnae) { where.push(`cnae_codigo LIKE $${i++}`); params.push(String(f.cnae) + '%'); }
-  if (f.q) { where.push(`(razao_social ILIKE $${i} OR nome_fantasia ILIKE $${i})`); params.push('%' + f.q + '%'); i++; }
+  if (f.municipio) { where.push(ila('municipio')); params.push('%' + f.municipio + '%'); i++; }
+  if (f.cnae) {
+    // por código (prefixo) OU por descrição (contém)
+    where.push(`(cnae_codigo LIKE $${i} OR ${hasUnaccent ? `unaccent(cnae_descricao) ILIKE unaccent($${i + 1})` : `cnae_descricao ILIKE $${i + 1}`})`);
+    params.push(String(f.cnae) + '%', '%' + f.cnae + '%'); i += 2;
+  }
+  if (f.q) {
+    where.push(`(${hasUnaccent ? `unaccent(razao_social) ILIKE unaccent($${i})` : `razao_social ILIKE $${i}`} OR ${hasUnaccent ? `unaccent(nome_fantasia) ILIKE unaccent($${i})` : `nome_fantasia ILIKE $${i}`})`);
+    params.push('%' + f.q + '%'); i++;
+  }
   const limit = Math.min(f.limit || 50, 200);
   const offset = f.offset || 0;
   const sql =

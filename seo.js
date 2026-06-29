@@ -173,7 +173,8 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   </main>
   <footer class="container footer">
     <p class="footer-links">
-      <a href="/">Início</a> · <a href="/validar-inscricao-estadual">Validar IE</a> ·
+      <a href="/">Início</a> · <a href="/busca">Busca de empresas</a> ·
+      <a href="/validar-inscricao-estadual">Validar IE</a> ·
       <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
       <a href="/incorporar">Incorporar</a> · <a href="/api">API</a><br />
       <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
@@ -676,6 +677,60 @@ function renderEmbed() {
   return contentPage('/incorporar', 'Incorporar consulta de Inscrição Estadual no seu site — SINTEGRA Brasil', 'Adicione gratuitamente a caixa de consulta de Inscrição Estadual por CNPJ no seu site.', 'Incorporar o widget no seu site', inner, 'Incorporar');
 }
 
+// --- Busca por CNAE / UF / município ---
+function renderBusca() {
+  const ufOpts = ['<option value="">UF (todas)</option>']
+    .concat(UFS.map((uf) => `<option value="${uf}">${uf}</option>`))
+    .join('');
+  const inner = `
+    <p>Encontre empresas por <strong>atividade (CNAE)</strong> e filtre por <strong>estado</strong> e
+    <strong>município</strong>. Exporte os resultados em <strong>CSV</strong> ou <strong>PDF</strong>.</p>
+
+    <form id="busca-form" class="busca-form no-print" autocomplete="off">
+      <input id="b-cnae" placeholder="CNAE: código (ex.: 5611) ou descrição (ex.: restaurante)" />
+      <div class="busca-row">
+        <select id="b-uf">${ufOpts}</select>
+        <input id="b-municipio" placeholder="Município (ex.: Vitória)" />
+      </div>
+      <input id="b-q" placeholder="Nome / razão social (opcional)" />
+      <button type="submit">Buscar</button>
+    </form>
+
+    <div id="busca-status" class="busca-status" aria-live="polite"></div>
+
+    <div id="busca-actions" class="result-actions no-print" hidden>
+      <button type="button" id="b-csv" class="act-btn">⬇ Baixar CSV</button>
+      <button type="button" id="b-pdf" class="act-btn">⬇ Baixar PDF</button>
+    </div>
+
+    <div class="table-wrap">
+      <table id="busca-table" class="busca-table" hidden>
+        <thead>
+          <tr><th>Razão social</th><th>Nome fantasia</th><th>CNAE</th><th>Município/UF</th><th></th></tr>
+        </thead>
+        <tbody id="busca-body"></tbody>
+      </table>
+    </div>
+
+    <div id="busca-pager" class="busca-pager no-print" hidden>
+      <button type="button" id="b-prev" class="act-btn">← Anterior</button>
+      <span id="b-page" class="muted"></span>
+      <button type="button" id="b-next" class="act-btn">Próxima →</button>
+    </div>
+
+    <p class="source">Resultados sobre a base já carregada. A Inscrição Estadual aparece ao abrir cada empresa
+    (preenchida na consulta). Dados públicos, caráter informativo.</p>
+    <script src="/busca.js?v=1"></script>`;
+  return contentPage(
+    '/busca',
+    'Busca de empresas por CNAE, estado e município — SINTEGRA Brasil',
+    'Encontre empresas por atividade econômica (CNAE) filtrando por estado (UF) e município. Exporte em CSV ou PDF.',
+    'Busca de empresas por CNAE, estado e município',
+    inner,
+    'Busca'
+  );
+}
+
 // --- Documentação da API pública ---
 function renderApiDocs() {
   const ex = `${SITE_URL}/api/v1/cnpj/00000000000191`;
@@ -748,6 +803,7 @@ module.exports = {
   GUIDES,
   CAPITAIS,
   ATIVIDADES,
+  renderBusca,
   renderApiDocs,
   maskCnpj,
   renderStatePage,
