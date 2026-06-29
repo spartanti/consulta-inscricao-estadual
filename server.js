@@ -13,9 +13,14 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const seo = require('./seo');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const CACHE_DIR = path.join(__dirname, 'data', 'cnpj');
+
+// Garante o diretorio de cache das paginas por CNPJ.
+fs.mkdirSync(CACHE_DIR, { recursive: true });
 
 // ---------------------------------------------------------------------------
 // Utilitarios de CNPJ
@@ -228,6 +233,65 @@ function buildResult(data) {
 }
 
 // ---------------------------------------------------------------------------
+// Cache em disco das consultas (alimenta as paginas /cnpj e o sitemap)
+// ---------------------------------------------------------------------------
+
+function cachePath(cnpj) {
+  return path.join(CACHE_DIR, `${cnpj}.json`);
+}
+
+function cacheGet(cnpj) {
+  try {
+    const raw = fs.readFileSync(cachePath(cnpj), 'utf8');
+    return JSON.parse(raw).data;
+  } catch (e) {
+    return null;
+  }
+}
+
+function cacheSet(cnpj, data) {
+  try {
+    fs.writeFileSync(
+      cachePath(cnpj),
+      JSON.stringify({ savedAt: new Date().toISOString(), data }),
+      'utf8'
+    );
+  } catch (e) {
+    /* cache best-effort */
+  }
+}
+
+/** Consulta unificada: usa cache; senao busca na API, monta e salva. */
+async function getCnpjData(cnpj) {
+  const cached = cacheGet(cnpj);
+  if (cached) return cached;
+  const raw = await fetchCnpj(cnpj);
+  const data = buildResult(raw);
+  cacheSet(cnpj, data);
+  return data;
+}
+
+/** Lista as consultas mais recentes (por data de modificacao do arquivo). */
+function listRecent(limit = 50) {
+  let files;
+  try {
+    files = fs.readdirSync(CACHE_DIR).filter((f) => f.endsWith('.json'));
+  } catch (e) {
+    return [];
+  }
+  const items = files
+    .map((f) => ({ f, mtime: fs.statSync(path.join(CACHE_DIR, f)).mtimeMs }))
+    .sort((a, b) => b.mtime - a.mtime)
+    .slice(0, limit)
+    .map(({ f }) => {
+      const cnpj = f.replace(/\.json$/, '');
+      const data = cacheGet(cnpj) || {};
+      return { cnpj, razao: data.razao_social || null, uf: data.uf || null };
+    });
+  return items;
+}
+
+// ---------------------------------------------------------------------------
 // Servidor HTTP
 // ---------------------------------------------------------------------------
 
@@ -247,6 +311,11 @@ function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
   res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(body);
+}
+
+function sendHtml(res, status, html, isHead) {
+  res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.end(isHead ? undefined : html);
 }
 
 function serveStatic(req, res) {
@@ -278,28 +347,74 @@ function serveStatic(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  const isHead = req.method === 'HEAD';
+  const isGet = req.method === 'GET' || isHead;
+  const urlObj = new URL(req.url, `http://${req.headers.host}`);
+  const pathname = decodeURIComponent(urlObj.pathname);
+
   // API: GET /api/consulta?cnpj=...
-  if (req.method === 'GET' && req.url.startsWith('/api/consulta')) {
-    const u = new URL(req.url, `http://${req.headers.host}`);
-    const cnpj = onlyDigits(u.searchParams.get('cnpj'));
-
-    if (!cnpj) {
-      return sendJson(res, 400, { erro: 'Informe o CNPJ.' });
-    }
-    if (!isValidCnpj(cnpj)) {
-      return sendJson(res, 400, { erro: 'CNPJ invalido. Verifique os digitos.' });
-    }
-
+  if (req.method === 'GET' && pathname === '/api/consulta') {
+    const cnpj = onlyDigits(urlObj.searchParams.get('cnpj'));
+    if (!cnpj) return sendJson(res, 400, { erro: 'Informe o CNPJ.' });
+    if (!isValidCnpj(cnpj)) return sendJson(res, 400, { erro: 'CNPJ invalido. Verifique os digitos.' });
     try {
-      const data = await fetchCnpj(cnpj);
-      return sendJson(res, 200, buildResult(data));
+      return sendJson(res, 200, await getCnpjData(cnpj));
     } catch (e) {
       return sendJson(res, e.status || 500, { erro: e.message || 'Erro interno.' });
     }
   }
 
-  // Arquivos estaticos (GET e HEAD)
-  if (req.method === 'GET' || req.method === 'HEAD') {
+  if (isGet) {
+    // Sitemap dinamico (home + estados + guias + consultas + CNPJs cacheados)
+    if (pathname === '/sitemap.xml') {
+      const urls = [
+        { loc: `${seo.SITE_URL}/`, priority: '1.0', lastmod: new Date().toISOString().slice(0, 10) },
+        { loc: `${seo.SITE_URL}/guias`, priority: '0.6' },
+        { loc: `${seo.SITE_URL}/consultas`, priority: '0.4' },
+        ...seo.UFS.map((uf) => ({ loc: `${seo.SITE_URL}/sintegra/${uf.toLowerCase()}`, priority: '0.8' })),
+        ...seo.GUIDES.map((g) => ({ loc: `${seo.SITE_URL}/guias/${g.slug}`, priority: '0.6' })),
+        ...listRecent(5000).map((c) => ({ loc: `${seo.SITE_URL}/cnpj/${c.cnpj}`, priority: '0.5' })),
+      ];
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(isHead ? undefined : seo.buildSitemapXml(urls));
+    }
+
+    // Paginas por estado: /sintegra/:uf
+    let m = pathname.match(/^\/sintegra\/([a-zA-Z]{2})\/?$/);
+    if (m) {
+      const html = seo.renderStatePage(m[1]);
+      return html ? sendHtml(res, 200, html, isHead) : sendHtml(res, 404, '<h1>Estado não encontrado</h1>', isHead);
+    }
+
+    // Paginas por CNPJ: /cnpj/:cnpj
+    m = pathname.match(/^\/cnpj\/(\d{14})\/?$/);
+    if (m) {
+      const cnpj = m[1];
+      if (!isValidCnpj(cnpj)) return sendHtml(res, 404, '<h1>CNPJ inválido</h1>', isHead);
+      try {
+        const data = await getCnpjData(cnpj);
+        return sendHtml(res, 200, seo.renderCnpjPage(data, cnpj), isHead);
+      } catch (e) {
+        return sendHtml(res, e.status === 404 ? 404 : 502, `<h1>${e.message || 'Erro na consulta'}</h1>`, isHead);
+      }
+    }
+
+    // Guias
+    if (pathname === '/guias' || pathname === '/guias/') {
+      return sendHtml(res, 200, seo.renderGuidesIndex(), isHead);
+    }
+    m = pathname.match(/^\/guias\/([a-z0-9-]+)\/?$/);
+    if (m) {
+      const html = seo.renderGuide(m[1]);
+      return html ? sendHtml(res, 200, html, isHead) : sendHtml(res, 404, '<h1>Guia não encontrado</h1>', isHead);
+    }
+
+    // Consultas recentes
+    if (pathname === '/consultas' || pathname === '/consultas/') {
+      return sendHtml(res, 200, seo.renderConsultas(listRecent(100)), isHead);
+    }
+
+    // Arquivos estaticos
     return serveStatic(req, res);
   }
 

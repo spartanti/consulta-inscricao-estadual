@@ -517,6 +517,64 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .footer { text-align: center; color: var(--cinza); padding: 24px 16px; }
 
+/* --- Navegação / páginas SSR --- */
+.brand-link { color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 10px; font-size: 20px; }
+.brand-link .badge { font-size: 13px; }
+
+.footer-links { font-size: 14px; margin: 0 0 12px; }
+.footer-links a { color: var(--azul-claro); text-decoration: none; }
+
+.states-nav {
+  font-size: 12.5px;
+  color: var(--cinza);
+  line-height: 2;
+  margin: 0 auto 14px;
+  max-width: 560px;
+}
+.states-nav span { font-weight: 600; }
+.states-nav a {
+  color: var(--azul);
+  text-decoration: none;
+  padding: 1px 5px;
+  border: 1px solid var(--borda);
+  border-radius: 6px;
+  margin: 0 1px;
+  display: inline-block;
+}
+.states-nav a:hover { background: #eef2f7; }
+
+.guides-list { list-style: none; padding: 0; margin: 12px 0 0; }
+.guides-list li { padding: 12px 0; border-bottom: 1px solid var(--borda); display: flex; flex-direction: column; gap: 3px; }
+.guides-list li a { color: var(--azul); text-decoration: none; font-size: 16px; }
+
+.seo-content ul { font-size: 14px; color: #374151; padding-left: 20px; }
+.seo-content ol.seo-steps { padding-left: 20px; }
+
+/* formulário SSR */
+.ssr-form { display: flex; gap: 10px; margin: 16px 0; }
+.ssr-form input {
+  flex: 1; padding: 12px 14px; font-size: 16px;
+  border: 1px solid var(--borda); border-radius: 10px; outline: none;
+}
+.ssr-form input:focus { border-color: var(--azul-claro); }
+.ssr-form button {
+  background: var(--azul); color: #fff; border: none; border-radius: 10px;
+  padding: 0 22px; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.ssr-form button:hover { background: var(--azul-claro); }
+
+/* IE em página de CNPJ */
+.ie-ssr { list-style: none; padding: 0; margin: 8px 0 0; }
+.ie-ssr li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: #f0f7f2; border: 1px solid #d4eadd; border-radius: 10px; margin-bottom: 8px; }
+.ie-num { font-size: 20px; font-weight: 700; color: var(--azul); letter-spacing: 0.5px; }
+.ie-uf-badge { background: var(--azul); color: #fff; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 6px; }
+.ie-ssr .tag { margin-left: auto; }
+
+@media (max-width: 480px) {
+  .ssr-form { flex-direction: column; }
+  .ssr-form button { padding: 12px; }
+}
+
 @media (max-width: 480px) {
   .input-row { flex-direction: column; }
   button { padding: 12px; }

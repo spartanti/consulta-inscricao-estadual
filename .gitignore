@@ -4,3 +4,6 @@ npm-debug.log*
 .env
 .env.*
 .DS_Store
+
+# cache de consultas (efêmero, não versionar)
+data/
