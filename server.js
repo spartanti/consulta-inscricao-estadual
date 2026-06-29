@@ -14,13 +14,24 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const seo = require('./seo');
+const db = require('./db');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const CACHE_DIR = path.join(__dirname, 'data', 'cnpj');
+const DATA_DIR = path.join(__dirname, 'data');
+const CACHE_DIR = path.join(DATA_DIR, 'cnpj');
 
-// Garante o diretorio de cache das paginas por CNPJ.
+// Garante o diretorio de dados (no volume persistente).
 fs.mkdirSync(CACHE_DIR, { recursive: true });
+
+// Inicializa o banco SQLite e migra o cache antigo (JSON) uma única vez.
+db.init(path.join(DATA_DIR, 'empresas.db'));
+try {
+  const migrated = db.migrateFromFiles(CACHE_DIR);
+  if (migrated > 0) console.log(`Migradas ${migrated} consultas do cache JSON para o SQLite.`);
+} catch (e) {
+  console.error('Falha na migração para SQLite:', e.message);
+}
 
 // ---------------------------------------------------------------------------
 // Utilitarios de CNPJ
@@ -236,59 +247,23 @@ function buildResult(data) {
 // Cache em disco das consultas (alimenta as paginas /cnpj e o sitemap)
 // ---------------------------------------------------------------------------
 
-function cachePath(cnpj) {
-  return path.join(CACHE_DIR, `${cnpj}.json`);
-}
-
-function cacheGet(cnpj) {
-  try {
-    const raw = fs.readFileSync(cachePath(cnpj), 'utf8');
-    return JSON.parse(raw).data;
-  } catch (e) {
-    return null;
-  }
-}
-
-function cacheSet(cnpj, data) {
-  try {
-    fs.writeFileSync(
-      cachePath(cnpj),
-      JSON.stringify({ savedAt: new Date().toISOString(), data }),
-      'utf8'
-    );
-  } catch (e) {
-    /* cache best-effort */
-  }
-}
-
-/** Consulta unificada: usa cache; senao busca na API, monta e salva. */
+/** Consulta unificada: usa o banco (cache); senao busca na API, monta e salva. */
 async function getCnpjData(cnpj) {
-  const cached = cacheGet(cnpj);
+  const cached = db.getCnpj(cnpj);
   if (cached) return cached;
   const raw = await fetchCnpj(cnpj);
   const data = buildResult(raw);
-  cacheSet(cnpj, data);
+  try { db.saveCnpj(cnpj, data); } catch (e) { /* best-effort */ }
   return data;
 }
 
-/** Lista as consultas mais recentes (por data de modificacao do arquivo). */
+/** Lista as consultas mais recentes (do banco). */
 function listRecent(limit = 50) {
-  let files;
   try {
-    files = fs.readdirSync(CACHE_DIR).filter((f) => f.endsWith('.json'));
+    return db.listRecent(limit);
   } catch (e) {
     return [];
   }
-  const items = files
-    .map((f) => ({ f, mtime: fs.statSync(path.join(CACHE_DIR, f)).mtimeMs }))
-    .sort((a, b) => b.mtime - a.mtime)
-    .slice(0, limit)
-    .map(({ f }) => {
-      const cnpj = f.replace(/\.json$/, '');
-      const data = cacheGet(cnpj) || {};
-      return { cnpj, razao: data.razao_social || null, uf: data.uf || null };
-    });
-  return items;
 }
 
 // ---------------------------------------------------------------------------
