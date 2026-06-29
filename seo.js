@@ -184,9 +184,13 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
       <strong>Aviso:</strong> o SINTEGRA Brasil é um serviço <strong>independente e privado</strong>,
       sem vínculo com a Receita Federal, com as SEFAZ estaduais ou com qualquer órgão público.
     </p>
+    <p class="counter">🔎 <span id="contador-num">—</span> consultas realizadas</p>
     <small>Desenvolvido por <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">Spartan TI</a></small>
   </footer>
-  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
+  <script>
+    if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}
+    fetch('/api/contador').then(function(r){return r.json();}).then(function(d){var e=document.getElementById('contador-num');if(e&&typeof d.count==='number')e.textContent=d.count.toLocaleString('pt-BR');}).catch(function(){});
+  </script>
 </body>
 </html>`;
 }

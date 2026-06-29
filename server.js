@@ -292,6 +292,33 @@ function listRecent(limit = 50) {
 }
 
 // ---------------------------------------------------------------------------
+// Contador de consultas (persistente no volume)
+// ---------------------------------------------------------------------------
+
+const COUNTER_FILE = path.join(__dirname, 'data', 'counter.json');
+const COUNTER_BASE = parseInt(process.env.COUNTER_BASE || '0', 10) || 0;
+
+function counterRaw() {
+  try {
+    return JSON.parse(fs.readFileSync(COUNTER_FILE, 'utf8')).n || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function counterGet() {
+  return COUNTER_BASE + counterRaw();
+}
+
+function counterInc() {
+  try {
+    fs.writeFileSync(COUNTER_FILE, JSON.stringify({ n: counterRaw() + 1 }), 'utf8');
+  } catch (e) {
+    /* best-effort */
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Servidor HTTP
 // ---------------------------------------------------------------------------
 
@@ -361,10 +388,17 @@ const server = http.createServer(async (req, res) => {
     if (!cnpj) return sendJson(res, 400, { erro: 'Informe o CNPJ.' });
     if (!isValidCnpj(cnpj)) return sendJson(res, 400, { erro: 'CNPJ invalido. Verifique os digitos.' });
     try {
-      return sendJson(res, 200, await getCnpjData(cnpj));
+      const data = await getCnpjData(cnpj);
+      counterInc();
+      return sendJson(res, 200, data);
     } catch (e) {
       return sendJson(res, e.status || 500, { erro: e.message || 'Erro interno.' });
     }
+  }
+
+  // Contador de consultas (leitura)
+  if (req.method === 'GET' && pathname === '/api/contador') {
+    return sendJson(res, 200, { count: counterGet() });
   }
 
   if (isGet) {

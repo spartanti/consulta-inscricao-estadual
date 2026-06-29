@@ -332,6 +332,17 @@ function afterResult(data) {
   updateFavBtn(cnpj);
   pushHistory(data);
   renderSaved();
+  fetchContador();
+}
+
+function fetchContador() {
+  fetch('/api/contador')
+    .then((r) => r.json())
+    .then((d) => {
+      const e = document.getElementById('contador-num');
+      if (e && typeof d.count === 'number') e.textContent = d.count.toLocaleString('pt-BR');
+    })
+    .catch(() => {});
 }
 
 function exportCsv(data) {
@@ -364,4 +375,5 @@ function exportCsv(data) {
   if (pdf) pdf.addEventListener('click', () => window.print());
   if (csv) csv.addEventListener('click', () => { if (lastData) exportCsv(lastData); });
   renderSaved();
+  fetchContador();
 })();
