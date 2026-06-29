@@ -37,6 +37,7 @@
   <meta name="twitter:image" content="https://www.sintegrabrasil.com.br/og-image.svg" />
 
   <link rel="stylesheet" href="/style.css" />
+  <link rel="manifest" href="/manifest.webmanifest" />
 
   <!-- Dados estruturados (Schema.org) -->
   <script type="application/ld+json">
@@ -50,7 +51,12 @@
         "name": "SINTEGRA Brasil",
         "description": "Consulta de Inscrição Estadual (IE) por CNPJ em todos os estados do Brasil.",
         "inLanguage": "pt-BR",
-        "publisher": { "@id": "https://www.sintegrabrasil.com.br/#org" }
+        "publisher": { "@id": "https://www.sintegrabrasil.com.br/#org" },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": { "@type": "EntryPoint", "urlTemplate": "https://www.sintegrabrasil.com.br/cnpj/{search_term_string}" },
+          "query-input": "required name=search_term_string"
+        }
       },
       {
         "@type": "Organization",
@@ -114,7 +120,7 @@
   </header>
 
   <main class="container">
-    <section class="card">
+    <section class="card search-card">
       <form id="form" autocomplete="off">
         <label for="cnpj">CNPJ</label>
         <div class="input-row">
@@ -156,6 +162,17 @@
       </div>
     </a>
 
+    <section id="saved" class="card saved-box no-print" hidden>
+      <div class="saved-col">
+        <h2 class="saved-title">★ Favoritos</h2>
+        <ul id="fav-list" class="saved-list"></ul>
+      </div>
+      <div class="saved-col">
+        <h2 class="saved-title">🕘 Consultas recentes</h2>
+        <ul id="hist-list" class="saved-list"></ul>
+      </div>
+    </section>
+
     <section id="status" class="status" aria-live="polite" hidden></section>
 
     <section id="result" class="card result" hidden>
@@ -165,6 +182,13 @@
           <p id="r-fantasia" class="muted"></p>
         </div>
         <span id="r-situacao" class="chip"></span>
+      </div>
+
+      <div class="result-actions no-print">
+        <button type="button" id="btn-fav" class="act-btn" title="Salvar nos favoritos">☆ Favoritar</button>
+        <button type="button" id="btn-pdf" class="act-btn">⬇ Salvar PDF</button>
+        <button type="button" id="btn-csv" class="act-btn">⬇ Baixar CSV</button>
+        <a id="btn-link" class="act-btn" href="#">🔗 Página da empresa</a>
       </div>
 
       <!-- Destaque: Inscrição Estadual (todas as UFs) -->
@@ -312,7 +336,11 @@
 
   <footer class="container footer">
     <p class="footer-links">
-      <a href="/">Início</a> · <a href="/guias">Guias</a> · <a href="/consultas">Consultas recentes</a>
+      <a href="/">Início</a> · <a href="/validar-inscricao-estadual">Validar IE</a> ·
+      <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
+      <a href="/consultas">Consultas</a> · <a href="/incorporar">Incorporar</a><br />
+      <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
+      <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos</a>
     </p>
     <nav class="states-nav">
       <span>Consulta por estado:</span>
@@ -330,5 +358,6 @@
   </footer>
 
   <script src="/app.js"></script>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 </body>
 </html>

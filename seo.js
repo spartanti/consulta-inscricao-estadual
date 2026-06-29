@@ -151,6 +151,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <link rel="canonical" href="${escapeHtml(canonical)}" />
   <meta name="theme-color" content="#0a3d62" />
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="${escapeHtml(title)}" />
   <meta property="og:description" content="${escapeHtml(description)}" />
@@ -172,7 +173,11 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   </main>
   <footer class="container footer">
     <p class="footer-links">
-      <a href="/">Início</a> · <a href="/guias">Guias</a> · <a href="/consultas">Consultas recentes</a>
+      <a href="/">Início</a> · <a href="/validar-inscricao-estadual">Validar IE</a> ·
+      <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
+      <a href="/consultas">Consultas</a> · <a href="/incorporar">Incorporar</a><br />
+      <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
+      <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos</a>
     </p>
     ${statesNav()}
     <p class="disclaimer">
@@ -181,6 +186,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
     </p>
     <small>Desenvolvido por <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">Spartan TI</a></small>
   </footer>
+  <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 </body>
 </html>`;
 }
@@ -388,16 +394,306 @@ function buildSitemapXml(urls) {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
 }
 
+// ---------------------------------------------------------------------------
+// Capitais (paginas por cidade — versao informativa)
+// ---------------------------------------------------------------------------
+
+const CAPITAIS = [
+  { slug: 'rio-branco-ac', cidade: 'Rio Branco', uf: 'AC' },
+  { slug: 'maceio-al', cidade: 'Maceió', uf: 'AL' },
+  { slug: 'macapa-ap', cidade: 'Macapá', uf: 'AP' },
+  { slug: 'manaus-am', cidade: 'Manaus', uf: 'AM' },
+  { slug: 'salvador-ba', cidade: 'Salvador', uf: 'BA' },
+  { slug: 'fortaleza-ce', cidade: 'Fortaleza', uf: 'CE' },
+  { slug: 'brasilia-df', cidade: 'Brasília', uf: 'DF' },
+  { slug: 'vitoria-es', cidade: 'Vitória', uf: 'ES' },
+  { slug: 'goiania-go', cidade: 'Goiânia', uf: 'GO' },
+  { slug: 'sao-luis-ma', cidade: 'São Luís', uf: 'MA' },
+  { slug: 'cuiaba-mt', cidade: 'Cuiabá', uf: 'MT' },
+  { slug: 'campo-grande-ms', cidade: 'Campo Grande', uf: 'MS' },
+  { slug: 'belo-horizonte-mg', cidade: 'Belo Horizonte', uf: 'MG' },
+  { slug: 'belem-pa', cidade: 'Belém', uf: 'PA' },
+  { slug: 'joao-pessoa-pb', cidade: 'João Pessoa', uf: 'PB' },
+  { slug: 'curitiba-pr', cidade: 'Curitiba', uf: 'PR' },
+  { slug: 'recife-pe', cidade: 'Recife', uf: 'PE' },
+  { slug: 'teresina-pi', cidade: 'Teresina', uf: 'PI' },
+  { slug: 'rio-de-janeiro-rj', cidade: 'Rio de Janeiro', uf: 'RJ' },
+  { slug: 'natal-rn', cidade: 'Natal', uf: 'RN' },
+  { slug: 'porto-alegre-rs', cidade: 'Porto Alegre', uf: 'RS' },
+  { slug: 'porto-velho-ro', cidade: 'Porto Velho', uf: 'RO' },
+  { slug: 'boa-vista-rr', cidade: 'Boa Vista', uf: 'RR' },
+  { slug: 'florianopolis-sc', cidade: 'Florianópolis', uf: 'SC' },
+  { slug: 'sao-paulo-sp', cidade: 'São Paulo', uf: 'SP' },
+  { slug: 'aracaju-se', cidade: 'Aracaju', uf: 'SE' },
+  { slug: 'palmas-to', cidade: 'Palmas', uf: 'TO' },
+];
+
+// ---------------------------------------------------------------------------
+// Atividades (paginas por CNAE/segmento — versao informativa)
+// ---------------------------------------------------------------------------
+
+const ATIVIDADES = [
+  { slug: 'comercio-varejista', nome: 'Comércio varejista', texto: 'lojas e varejo em geral, que vendem mercadorias diretamente ao consumidor' },
+  { slug: 'comercio-atacadista', nome: 'Comércio atacadista', texto: 'distribuidoras e atacados que revendem mercadorias em grande volume' },
+  { slug: 'industria', nome: 'Indústria e fabricação', texto: 'fábricas e indústrias que produzem ou transformam mercadorias' },
+  { slug: 'restaurantes', nome: 'Restaurantes e lanchonetes', texto: 'bares, restaurantes e lanchonetes que comercializam alimentos e bebidas' },
+  { slug: 'supermercados', nome: 'Supermercados e mercearias', texto: 'supermercados, mercearias e mercados de bairro' },
+  { slug: 'farmacias', nome: 'Farmácias e drogarias', texto: 'farmácias e drogarias que vendem medicamentos e produtos de higiene' },
+  { slug: 'autopecas', nome: 'Autopeças e oficinas', texto: 'lojas de autopeças e oficinas que comercializam peças' },
+  { slug: 'vestuario', nome: 'Comércio de vestuário', texto: 'lojas de roupas, calçados e acessórios' },
+  { slug: 'materiais-de-construcao', nome: 'Materiais de construção', texto: 'lojas de materiais de construção e ferragens' },
+  { slug: 'comercio-de-veiculos', nome: 'Comércio de veículos', texto: 'concessionárias e revendas de veículos' },
+  { slug: 'ecommerce', nome: 'E-commerce e venda online', texto: 'lojas virtuais e empresas de venda pela internet' },
+  { slug: 'transporte-de-cargas', nome: 'Transporte de cargas', texto: 'transportadoras e empresas de transporte de mercadorias' },
+];
+
+// ---------------------------------------------------------------------------
+// Render helpers genericos
+// ---------------------------------------------------------------------------
+
+function contentPage(slugPath, title, description, h1, innerHtml, breadcrumbName) {
+  const canonical = `${SITE_URL}${slugPath}`;
+  const bodyHtml = `<article class="card seo-content"><h1>${escapeHtml(h1)}</h1>${innerHtml}</article>`;
+  const breadcrumb = breadcrumbName
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE_URL}/` },
+          { '@type': 'ListItem', position: 2, name: breadcrumbName, item: canonical },
+        ],
+      }
+    : undefined;
+  return layout({ title, description, canonical, bodyHtml, breadcrumb });
+}
+
+// --- Cidade ---
+function renderCidade(slug) {
+  const c = CAPITAIS.find((x) => x.slug === slug);
+  if (!c) return null;
+  const nomeUF = UF_INFO[c.uf];
+  const inner = `
+    <p>Consulte a <strong>Inscrição Estadual (IE)</strong> de empresas de
+    <strong>${escapeHtml(c.cidade)} (${c.uf})</strong> informando o CNPJ. A consulta é gratuita e mostra
+    a situação cadastral e os dados públicos da empresa.</p>
+    ${searchForm()}
+    <h2>SINTEGRA e Inscrição Estadual em ${escapeHtml(c.cidade)}</h2>
+    <p>Empresas contribuintes do ICMS em ${escapeHtml(c.cidade)}, capital de ${escapeHtml(nomeUF)}, possuem
+    Inscrição Estadual junto à SEFAZ-${c.uf}. Veja também a
+    <a href="/sintegra/${c.uf.toLowerCase()}">consulta para todo o estado de ${escapeHtml(nomeUF)}</a>.</p>`;
+  return contentPage(
+    `/cidade/${slug}`,
+    `Consulta de Inscrição Estadual em ${c.cidade} (${c.uf}) por CNPJ`,
+    `Consulte a Inscrição Estadual de empresas de ${c.cidade} (${c.uf}) pelo CNPJ. Gratuito e na hora.`,
+    `Inscrição Estadual em ${c.cidade} (${c.uf})`,
+    inner,
+    `${c.cidade}/${c.uf}`
+  );
+}
+
+// --- Atividade (CNAE) ---
+function renderAtividadesIndex() {
+  const items = ATIVIDADES.map(
+    (a) => `<li><a href="/atividade/${a.slug}"><strong>${escapeHtml(a.nome)}</strong></a></li>`
+  ).join('');
+  return contentPage(
+    '/atividades',
+    'Inscrição Estadual por atividade (CNAE) — SINTEGRA Brasil',
+    'Consulta de Inscrição Estadual por tipo de atividade econômica (CNAE): comércio, indústria, serviços e mais.',
+    'Inscrição Estadual por atividade econômica',
+    `<p>Veja orientações sobre Inscrição Estadual conforme a atividade da empresa:</p><ul class="guides-list">${items}</ul>`
+  );
+}
+
+function renderAtividade(slug) {
+  const a = ATIVIDADES.find((x) => x.slug === slug);
+  if (!a) return null;
+  const inner = `
+    <p>Empresas de <strong>${escapeHtml(a.nome.toLowerCase())}</strong> — ${escapeHtml(a.texto)} —
+    normalmente são contribuintes do ICMS e precisam de <strong>Inscrição Estadual</strong>.</p>
+    ${searchForm()}
+    <h2>Por que ${escapeHtml(a.nome.toLowerCase())} precisa de Inscrição Estadual</h2>
+    <p>Atividades de circulação de mercadorias exigem registro na SEFAZ do estado para emitir nota fiscal
+    e recolher o ICMS. Você pode <a href="/">verificar a IE de qualquer empresa pelo CNPJ</a>.</p>
+    <p>Veja também a <a href="/atividades">lista de atividades</a> e os
+    <a href="/guias">guias sobre Inscrição Estadual</a>.</p>`;
+  return contentPage(
+    `/atividade/${a.slug}`,
+    `Inscrição Estadual para ${a.nome} (CNAE) — SINTEGRA Brasil`,
+    `Inscrição Estadual e SINTEGRA para empresas de ${a.nome.toLowerCase()}. Consulte pelo CNPJ.`,
+    `Inscrição Estadual para ${a.nome}`,
+    inner,
+    a.nome
+  );
+}
+
+// --- Institucionais ---
+function renderSobre() {
+  const inner = `
+    <p>O <strong>SINTEGRA Brasil</strong> é uma ferramenta gratuita para consultar a
+    <strong>Inscrição Estadual (IE)</strong> de empresas de todo o Brasil a partir do CNPJ.</p>
+    <p>Nosso objetivo é facilitar a verificação de dados cadastrais públicos de empresas, de forma rápida
+    e sem cadastro, para contadores, empreendedores e profissionais que precisam validar fornecedores e clientes.</p>
+    <h2>Quem somos</h2>
+    <p>O serviço é desenvolvido e mantido pela <strong>Spartan TI</strong>
+    (<a href="https://www.spartanti.com.br" target="_blank" rel="noopener">spartanti.com.br</a>).</p>
+    <h2>Fontes dos dados</h2>
+    <p>Os dados são obtidos de bases públicas (Receita Federal e SEFAZ, via API CNPJ.ws) e têm caráter
+    informativo. Para fins oficiais, confirme sempre no SINTEGRA da SEFAZ do estado.</p>
+    <p><strong>Importante:</strong> não temos vínculo com a Receita Federal, com as Secretarias de Fazenda
+    estaduais ou com qualquer órgão público. Não somos um site oficial do governo.</p>`;
+  return contentPage('/sobre', 'Sobre o SINTEGRA Brasil', 'Conheça o SINTEGRA Brasil, ferramenta gratuita de consulta de Inscrição Estadual por CNPJ, mantida pela Spartan TI.', 'Sobre o SINTEGRA Brasil', inner, 'Sobre');
+}
+
+function renderContato() {
+  const inner = `
+    <p>Fale com a equipe do SINTEGRA Brasil:</p>
+    <ul>
+      <li><strong>Responsável:</strong> Spartan TI</li>
+      <li><strong>Site:</strong> <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">www.spartanti.com.br</a></li>
+    </ul>
+    <p>Para solicitar a remoção ou correção de dados, ou tirar dúvidas sobre privacidade, utilize os canais
+    da Spartan TI. Veja também nossa <a href="/privacidade">Política de Privacidade</a>.</p>`;
+  return contentPage('/contato', 'Contato — SINTEGRA Brasil', 'Entre em contato com o SINTEGRA Brasil (Spartan TI).', 'Contato', inner, 'Contato');
+}
+
+function renderPrivacidade() {
+  const inner = `
+    <p>Esta Política de Privacidade descreve como o SINTEGRA Brasil trata informações ao usar nosso site.</p>
+    <h2>Dados consultados</h2>
+    <p>As consultas exibem dados <strong>públicos</strong> de empresas (CNPJ), obtidos de bases públicas
+    (Receita Federal e SEFAZ). Não exibimos dados pessoais de sócios em páginas indexáveis.</p>
+    <h2>Cookies e analytics</h2>
+    <p>Utilizamos o Google Analytics para medir o uso do site de forma agregada. Esses serviços podem usar
+    cookies. Você pode bloquear cookies nas configurações do seu navegador.</p>
+    <h2>Dados que você fornece</h2>
+    <p>Não exigimos cadastro. O CNPJ digitado é usado apenas para realizar a consulta.</p>
+    <h2>Remoção de dados (LGPD)</h2>
+    <p>Pedidos de remoção ou correção podem ser feitos pelos canais da <a href="/contato">página de contato</a>.</p>
+    <h2>Responsável</h2>
+    <p>O tratamento é realizado pela Spartan TI. Este é um serviço independente, sem vínculo com órgãos públicos.</p>`;
+  return contentPage('/privacidade', 'Política de Privacidade — SINTEGRA Brasil', 'Política de Privacidade e tratamento de dados (LGPD) do SINTEGRA Brasil.', 'Política de Privacidade', inner, 'Privacidade');
+}
+
+function renderTermos() {
+  const inner = `
+    <p>Ao usar o SINTEGRA Brasil, você concorda com estes Termos de Uso.</p>
+    <h2>Uso da ferramenta</h2>
+    <p>O serviço é fornecido de forma gratuita e "como está", para fins informativos. Os dados são obtidos
+    de bases públicas e podem conter desatualizações. Para fins oficiais, confirme no SINTEGRA da SEFAZ.</p>
+    <h2>Limitação de responsabilidade</h2>
+    <p>Não nos responsabilizamos por decisões tomadas com base nas informações exibidas. Recomendamos sempre
+    a conferência nas fontes oficiais.</p>
+    <h2>Uso indevido</h2>
+    <p>É proibido o uso automatizado abusivo, a coleta em massa ou qualquer uso que viole a legislação vigente.</p>
+    <h2>Independência</h2>
+    <p>O SINTEGRA Brasil é um serviço independente, sem vínculo com a Receita Federal, SEFAZ ou órgãos públicos.</p>`;
+  return contentPage('/termos', 'Termos de Uso — SINTEGRA Brasil', 'Termos de Uso do SINTEGRA Brasil.', 'Termos de Uso', inner, 'Termos');
+}
+
+// --- Validador de IE ---
+function renderValidador() {
+  const options = UFS.map((uf) => `<option value="${uf}">${uf} — ${escapeHtml(UF_INFO[uf])}</option>`).join('');
+  const inner = `
+    <p>Verifique se uma <strong>Inscrição Estadual</strong> é válida (dígito verificador e formato) conforme
+    as regras de cada estado. Ferramenta gratuita e informativa.</p>
+    <div class="validator">
+      <div class="validator-row">
+        <select id="v-uf">${options}</select>
+        <input id="v-ie" inputmode="numeric" placeholder="Digite a Inscrição Estadual" />
+        <button id="v-btn" type="button">Validar</button>
+      </div>
+      <div id="v-result" class="v-result" hidden></div>
+    </div>
+    <p class="source">Validação conforme regras padrão de cada UF. Para fins oficiais, confirme no SINTEGRA da SEFAZ.</p>
+    <h2>Como funciona</h2>
+    <p>Cada estado tem um algoritmo próprio de dígito verificador para a Inscrição Estadual. Esta ferramenta
+    aplica essas regras localmente, no seu navegador. Para consultar a IE real de uma empresa,
+    <a href="/">use a busca por CNPJ</a>.</p>
+    <script src="/ie-validator.js"></script>
+    <script>
+      (function(){
+        var btn=document.getElementById('v-btn'),uf=document.getElementById('v-uf'),
+            ie=document.getElementById('v-ie'),out=document.getElementById('v-result');
+        function run(){var r=window.validarIE(uf.value,ie.value);out.hidden=false;
+          out.className='v-result '+(r.valido?'ok':'bad');out.textContent=r.motivo;}
+        btn.addEventListener('click',run);
+        ie.addEventListener('keydown',function(e){if(e.key==='Enter')run();});
+      })();
+    </script>`;
+  return contentPage(
+    '/validar-inscricao-estadual',
+    'Validar Inscrição Estadual (IE) por estado — SINTEGRA Brasil',
+    'Valide gratuitamente o dígito verificador da Inscrição Estadual de qualquer estado do Brasil.',
+    'Validador de Inscrição Estadual',
+    inner,
+    'Validar IE'
+  );
+}
+
+// --- Widget embedável ---
+function renderWidget() {
+  return `<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="robots" content="noindex" />
+<title>Consulta de Inscrição Estadual</title>
+<style>
+  body{margin:0;font-family:system-ui,Arial,sans-serif;background:#fff;color:#1f2937;padding:16px}
+  .wt{font-size:13px;font-weight:700;color:#0a3d62;margin:0 0 8px}
+  form{display:flex;gap:8px}
+  input{flex:1;padding:11px 12px;font-size:15px;border:1px solid #e4e8ee;border-radius:10px}
+  button{background:#0a3d62;color:#fff;border:0;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer}
+  .pw{font-size:11px;color:#6b7280;margin:10px 0 0;text-align:right}
+  .pw a{color:#1e6091;text-decoration:none;font-weight:600}
+</style></head>
+<body>
+  <p class="wt">Consulta de Inscrição Estadual por CNPJ</p>
+  <form onsubmit="event.preventDefault();var c=this.cnpj.value.replace(/\\D/g,'');if(c.length===14){window.open('${SITE_URL}/cnpj/'+c,'_blank');}else{alert('Digite os 14 dígitos do CNPJ');}">
+    <input name="cnpj" inputmode="numeric" maxlength="18" placeholder="Digite o CNPJ" />
+    <button type="submit">Consultar</button>
+  </form>
+  <p class="pw">por <a href="${SITE_URL}" target="_blank">SINTEGRA Brasil</a></p>
+</body></html>`;
+}
+
+function renderEmbed() {
+  const code = `<script src="${SITE_URL}/widget.js" async></script>`;
+  const iframeCode = `<iframe src="${SITE_URL}/widget" width="440" height="210" style="border:0;border-radius:14px" title="Consulta de Inscrição Estadual"></iframe>`;
+  const inner = `
+    <p>Adicione a caixa de consulta de Inscrição Estadual no seu site gratuitamente. Basta copiar um dos códigos abaixo.</p>
+    <h2>Opção 1 — Script (recomendado)</h2>
+    <pre class="codeblock">${escapeHtml(code)}</pre>
+    <h2>Opção 2 — iframe</h2>
+    <pre class="codeblock">${escapeHtml(iframeCode)}</pre>
+    <h2>Pré-visualização</h2>
+    <iframe src="/widget" width="100%" height="210" style="border:1px solid #e4e8ee;border-radius:14px;max-width:440px" title="Pré-visualização do widget"></iframe>
+    <p class="source">Ao incorporar, você concorda com nossos <a href="/termos">Termos de Uso</a>.</p>`;
+  return contentPage('/incorporar', 'Incorporar consulta de Inscrição Estadual no seu site — SINTEGRA Brasil', 'Adicione gratuitamente a caixa de consulta de Inscrição Estadual por CNPJ no seu site.', 'Incorporar o widget no seu site', inner, 'Incorporar');
+}
+
 module.exports = {
   SITE_URL,
   UFS,
   UF_INFO,
   GUIDES,
+  CAPITAIS,
+  ATIVIDADES,
   maskCnpj,
   renderStatePage,
   renderCnpjPage,
   renderGuidesIndex,
   renderGuide,
   renderConsultas,
+  renderCidade,
+  renderAtividadesIndex,
+  renderAtividade,
+  renderSobre,
+  renderContato,
+  renderPrivacidade,
+  renderTermos,
+  renderValidador,
+  renderWidget,
+  renderEmbed,
   buildSitemapXml,
 };

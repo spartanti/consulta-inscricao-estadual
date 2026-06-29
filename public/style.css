@@ -579,3 +579,57 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   .input-row { flex-direction: column; }
   button { padding: 12px; }
 }
+
+/* === Destaque da caixa de consulta === */
+.search-card {
+  border-color: #cfe0ee;
+  border-top: 4px solid var(--azul-claro);
+  box-shadow: 0 8px 26px rgba(10, 61, 98, 0.14);
+}
+
+/* === Botões de ação no resultado === */
+.result-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.act-btn {
+  font-size: 13px; font-weight: 600; color: var(--azul);
+  background: #eef2f7; border: 1px solid var(--borda); border-radius: 999px;
+  padding: 7px 14px; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+}
+.act-btn:hover { background: #e2e9f1; }
+.act-btn.on { background: #fff3d6; color: #8a5a00; border-color: #ffe1a8; }
+
+/* === Histórico e favoritos === */
+.saved-box { display: flex; gap: 24px; flex-wrap: wrap; }
+.saved-col { flex: 1; min-width: 200px; }
+.saved-title { font-size: 14px; color: var(--azul); margin: 0 0 8px; }
+.saved-list { list-style: none; padding: 0; margin: 0; font-size: 13.5px; }
+.saved-list li { padding: 6px 0; border-bottom: 1px solid var(--borda); }
+.saved-list a { color: var(--azul-claro); text-decoration: none; font-weight: 600; }
+
+/* === Validador de IE === */
+.validator { margin: 14px 0; }
+.validator-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.validator-row select, .validator-row input {
+  padding: 11px 12px; font-size: 15px; border: 1px solid var(--borda); border-radius: 10px;
+}
+.validator-row select { flex: 0 0 auto; max-width: 220px; }
+.validator-row input { flex: 1; min-width: 160px; }
+.validator-row button { background: var(--azul); color: #fff; border: 0; border-radius: 10px; padding: 0 20px; font-weight: 700; cursor: pointer; }
+.v-result { margin-top: 12px; padding: 12px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+.v-result.ok { background: #e7f6ec; color: var(--verde); }
+.v-result.bad { background: #fdecea; color: var(--vermelho); }
+
+/* === Bloco de código (incorporar) === */
+.codeblock {
+  background: #0a3d62; color: #e8f1fb; padding: 14px 16px; border-radius: 10px;
+  font-family: ui-monospace, "Courier New", monospace; font-size: 13px;
+  overflow-x: auto; white-space: pre-wrap; word-break: break-all;
+}
+
+/* === Impressão / PDF === */
+@media print {
+  .topbar, .footer, .adbanner, .seo-content, .source, .disclaimer,
+  .aviso-limite, .search-card, #saved, #status, .no-print { display: none !important; }
+  body { background: #fff; }
+  .card { box-shadow: none; border: none; }
+  .result { display: block !important; }
+}

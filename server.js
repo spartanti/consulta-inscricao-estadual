@@ -337,9 +337,12 @@ function serveStatic(req, res) {
       return res.end(isHead ? undefined : 'Arquivo nao encontrado');
     }
     const ext = path.extname(filePath).toLowerCase();
+    // HTML sem cache agressivo; assets (css/js/svg/img) cacheados por 1 dia.
+    const cacheControl = ext === '.html' ? 'no-cache' : 'public, max-age=86400';
     res.writeHead(200, {
       'Content-Type': CONTENT_TYPES[ext] || 'application/octet-stream',
       'Content-Length': content.length,
+      'Cache-Control': cacheControl,
     });
     // HEAD: envia apenas os cabecalhos, sem corpo.
     res.end(isHead ? undefined : content);
@@ -369,9 +372,18 @@ const server = http.createServer(async (req, res) => {
     if (pathname === '/sitemap.xml') {
       const urls = [
         { loc: `${seo.SITE_URL}/`, priority: '1.0', lastmod: new Date().toISOString().slice(0, 10) },
+        { loc: `${seo.SITE_URL}/validar-inscricao-estadual`, priority: '0.7' },
+        { loc: `${seo.SITE_URL}/atividades`, priority: '0.6' },
         { loc: `${seo.SITE_URL}/guias`, priority: '0.6' },
+        { loc: `${seo.SITE_URL}/incorporar`, priority: '0.5' },
         { loc: `${seo.SITE_URL}/consultas`, priority: '0.4' },
+        { loc: `${seo.SITE_URL}/sobre`, priority: '0.4' },
+        { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
+        { loc: `${seo.SITE_URL}/privacidade`, priority: '0.3' },
+        { loc: `${seo.SITE_URL}/termos`, priority: '0.3' },
         ...seo.UFS.map((uf) => ({ loc: `${seo.SITE_URL}/sintegra/${uf.toLowerCase()}`, priority: '0.8' })),
+        ...seo.CAPITAIS.map((c) => ({ loc: `${seo.SITE_URL}/cidade/${c.slug}`, priority: '0.6' })),
+        ...seo.ATIVIDADES.map((a) => ({ loc: `${seo.SITE_URL}/atividade/${a.slug}`, priority: '0.6' })),
         ...seo.GUIDES.map((g) => ({ loc: `${seo.SITE_URL}/guias/${g.slug}`, priority: '0.6' })),
         ...listRecent(5000).map((c) => ({ loc: `${seo.SITE_URL}/cnpj/${c.cnpj}`, priority: '0.5' })),
       ];
@@ -412,6 +424,48 @@ const server = http.createServer(async (req, res) => {
     // Consultas recentes
     if (pathname === '/consultas' || pathname === '/consultas/') {
       return sendHtml(res, 200, seo.renderConsultas(listRecent(100)), isHead);
+    }
+
+    // Cidades (capitais)
+    m = pathname.match(/^\/cidade\/([a-z0-9-]+)\/?$/);
+    if (m) {
+      const html = seo.renderCidade(m[1]);
+      return html ? sendHtml(res, 200, html, isHead) : sendHtml(res, 404, '<h1>Cidade não encontrada</h1>', isHead);
+    }
+
+    // Atividades (CNAE)
+    if (pathname === '/atividades' || pathname === '/atividades/') {
+      return sendHtml(res, 200, seo.renderAtividadesIndex(), isHead);
+    }
+    m = pathname.match(/^\/atividade\/([a-z0-9-]+)\/?$/);
+    if (m) {
+      const html = seo.renderAtividade(m[1]);
+      return html ? sendHtml(res, 200, html, isHead) : sendHtml(res, 404, '<h1>Atividade não encontrada</h1>', isHead);
+    }
+
+    // Validador de IE
+    if (pathname === '/validar-inscricao-estadual' || pathname === '/validar-inscricao-estadual/') {
+      return sendHtml(res, 200, seo.renderValidador(), isHead);
+    }
+
+    // Widget e incorporação
+    if (pathname === '/widget' || pathname === '/widget/') {
+      return sendHtml(res, 200, seo.renderWidget(), isHead);
+    }
+    if (pathname === '/incorporar' || pathname === '/incorporar/') {
+      return sendHtml(res, 200, seo.renderEmbed(), isHead);
+    }
+
+    // Páginas institucionais
+    const inst = {
+      '/sobre': seo.renderSobre,
+      '/contato': seo.renderContato,
+      '/privacidade': seo.renderPrivacidade,
+      '/termos': seo.renderTermos,
+    };
+    const instKey = pathname.replace(/\/$/, '');
+    if (inst[instKey]) {
+      return sendHtml(res, 200, inst[instKey](), isHead);
     }
 
     // Arquivos estaticos

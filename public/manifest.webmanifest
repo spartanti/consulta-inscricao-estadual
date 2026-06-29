@@ -1,0 +1,14 @@
+{
+  "name": "SINTEGRA Brasil — Consulta de Inscrição Estadual",
+  "short_name": "SINTEGRA Brasil",
+  "description": "Consulte a Inscrição Estadual de empresas de todo o Brasil pelo CNPJ.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0a3d62",
+  "theme_color": "#0a3d62",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
