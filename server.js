@@ -483,6 +483,7 @@ const server = http.createServer(async (req, res) => {
         { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/privacidade`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/termos`, priority: '0.3' },
+        { loc: `${seo.SITE_URL}/cookies`, priority: '0.3' },
         ...seo.UFS.map((uf) => ({ loc: `${seo.SITE_URL}/sintegra/${uf.toLowerCase()}`, priority: '0.8' })),
         ...seo.CAPITAIS.map((c) => ({ loc: `${seo.SITE_URL}/cidade/${c.slug}`, priority: '0.6' })),
         ...seo.ATIVIDADES.map((a) => ({ loc: `${seo.SITE_URL}/atividade/${a.slug}`, priority: '0.6' })),
@@ -574,6 +575,7 @@ const server = http.createServer(async (req, res) => {
       '/contato': seo.renderContato,
       '/privacidade': seo.renderPrivacidade,
       '/termos': seo.renderTermos,
+      '/cookies': seo.renderCookies,
     };
     const instKey = pathname.replace(/\/$/, '');
     if (inst[instKey]) {

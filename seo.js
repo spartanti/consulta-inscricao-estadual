@@ -174,7 +174,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
       <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
       <a href="/incorporar">Incorporar</a> · <a href="/api">API</a><br />
       <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
-      <a href="/privacidade">Privacidade</a> · <a href="/termos">Termos</a>
+      <a href="/privacidade">Privacidade</a> · <a href="/cookies">Cookies</a> · <a href="/termos">Termos</a>
     </p>
     ${statesNav()}
     <p class="disclaimer">
@@ -551,10 +551,12 @@ function renderContato() {
     <p>Fale com a equipe do SINTEGRA Brasil:</p>
     <ul>
       <li><strong>Responsável:</strong> Spartan TI</li>
+      <li><strong>E-mail / Encarregado (DPO):</strong> <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a></li>
       <li><strong>Site:</strong> <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">www.spartanti.com.br</a></li>
     </ul>
-    <p>Para solicitar a remoção ou correção de dados, ou tirar dúvidas sobre privacidade, utilize os canais
-    da Spartan TI. Veja também nossa <a href="/privacidade">Política de Privacidade</a>.</p>`;
+    <p>Para solicitar a remoção ou correção de dados, exercer seus direitos da LGPD ou tirar dúvidas sobre
+    privacidade, escreva para <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a>.
+    Veja também nossa <a href="/privacidade">Política de Privacidade</a>.</p>`;
   return contentPage('/contato', 'Contato — SINTEGRA Brasil', 'Entre em contato com o SINTEGRA Brasil (Spartan TI).', 'Contato', inner, 'Contato');
 }
 
@@ -566,8 +568,9 @@ function renderPrivacidade() {
 
     <h2>1. Controlador dos dados</h2>
     <p>O controlador é a <strong>Spartan TI</strong>
-    (<a href="https://www.spartanti.com.br" target="_blank" rel="noopener">spartanti.com.br</a>). Para assuntos
-    de privacidade e para falar com o Encarregado (DPO), use a <a href="/contato">página de Contato</a>.</p>
+    (<a href="https://www.spartanti.com.br" target="_blank" rel="noopener">spartanti.com.br</a>).
+    Encarregado pelo Tratamento de Dados (DPO) / contato de privacidade:
+    <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a>.</p>
 
     <h2>2. Dados que tratamos</h2>
     <ul>
@@ -598,7 +601,7 @@ function renderPrivacidade() {
     (Google Analytics) só são ativados após o seu <strong>consentimento</strong> no aviso exibido na primeira
     visita. Você pode
     <a href="#" onclick="if(window.gerenciarCookies){gerenciarCookies();}return false;">alterar suas preferências de cookies</a>
-    a qualquer momento.</p>
+    a qualquer momento. Veja a lista completa na <a href="/cookies">Política de Cookies</a>.</p>
 
     <h2>6. Compartilhamento e operadores</h2>
     <p>Podemos compartilhar dados com prestadores que viabilizam o serviço: <strong>Google</strong> (Analytics),
@@ -615,8 +618,8 @@ function renderPrivacidade() {
 
     <h2>9. Seus direitos (art. 18 da LGPD)</h2>
     <p>Você pode solicitar: confirmação e acesso aos dados; correção; anonimização, bloqueio ou eliminação;
-    portabilidade; informação sobre compartilhamentos; e revogação do consentimento. Para exercer, use a
-    <a href="/contato">página de Contato</a>.</p>
+    portabilidade; informação sobre compartilhamentos; e revogação do consentimento. Para exercer, escreva para
+    <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a> ou use a <a href="/contato">página de Contato</a>.</p>
 
     <h2>10. Remoção de dados de empresa/sócio</h2>
     <p>Pedidos de remoção ou correção de informações exibidas podem ser feitos pela
@@ -683,6 +686,44 @@ function renderTermos() {
     <h2>11. Contato</h2>
     <p>Dúvidas sobre estes Termos: <a href="/contato">página de Contato</a>.</p>`;
   return contentPage('/termos', 'Termos de Uso — SINTEGRA Brasil', 'Termos de Uso do SINTEGRA Brasil: natureza informativa dos dados, uso permitido, limitação de responsabilidade e legislação aplicável.', 'Termos de Uso', inner, 'Termos');
+}
+
+// --- Política de Cookies ---
+function renderCookies() {
+  const inner = `
+    <p class="muted">Última atualização: 29/06/2026.</p>
+    <p>Esta página detalha os cookies e tecnologias semelhantes utilizados pelo <strong>SINTEGRA Brasil</strong>,
+    em complemento à <a href="/privacidade">Política de Privacidade</a>.</p>
+
+    <h2>O que são cookies</h2>
+    <p>São pequenos arquivos/identificadores armazenados no seu navegador para lembrar preferências e medir o
+    uso do site. Cookies de <strong>análise</strong> só são ativados com o seu <strong>consentimento</strong>.</p>
+
+    <h2>Cookies e armazenamentos utilizados</h2>
+    <div class="table-wrap">
+      <table class="busca-table">
+        <thead><tr><th>Nome</th><th>Tipo</th><th>Finalidade</th><th>Duração</th></tr></thead>
+        <tbody>
+          <tr><td>sb_consent</td><td>Necessário (localStorage)</td><td>Guarda sua escolha de aceitar/recusar cookies de análise</td><td>Até você limpar</td></tr>
+          <tr><td>sb_fav</td><td>Necessário (localStorage)</td><td>Guarda seus favoritos de consulta (fica só no seu navegador)</td><td>Até você limpar</td></tr>
+          <tr><td>_ga</td><td>Análise — Google Analytics</td><td>Distingue usuários (estatística de audiência)</td><td>2 anos</td></tr>
+          <tr><td>_ga_&lt;ID&gt;</td><td>Análise — Google Analytics</td><td>Mantém o estado da sessão (GA4)</td><td>2 anos</td></tr>
+          <tr><td>_gid</td><td>Análise — Google Analytics</td><td>Distingue usuários (quando aplicável)</td><td>24 horas</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="muted">Os cookies <code>_ga*</code> só são gravados se você <strong>aceitar</strong> os cookies de análise.
+    Usamos anonimização de IP no Google Analytics.</p>
+
+    <h2>Gerenciar preferências</h2>
+    <p>Você pode rever sua escolha a qualquer momento:
+    <a href="#" onclick="if(window.gerenciarCookies){gerenciarCookies();}return false;">abrir o aviso de cookies</a>.
+    Também é possível bloquear ou apagar cookies nas configurações do seu navegador.</p>
+
+    <h2>Terceiros</h2>
+    <p>O Google Analytics é operado pelo Google. Consulte as políticas do Google para mais detalhes sobre o
+    tratamento desses dados.</p>`;
+  return contentPage('/cookies', 'Política de Cookies — SINTEGRA Brasil', 'Lista de cookies usados pelo SINTEGRA Brasil (incluindo Google Analytics), finalidade, duração e como gerenciar.', 'Política de Cookies', inner, 'Cookies');
 }
 
 // --- Validador de IE ---
@@ -893,6 +934,7 @@ module.exports = {
   CAPITAIS,
   ATIVIDADES,
   renderBusca,
+  renderCookies,
   renderApiDocs,
   maskCnpj,
   renderStatePage,
