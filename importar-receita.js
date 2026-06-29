@@ -28,6 +28,7 @@ const db = require('./db');
 
 const BASE = process.env.BASE || 'https://arquivos.receitafederal.gov.br/dados/cnpj/dados_abertos_cnpj';
 const MES = process.env.MES || '';
+const LOCAL_DIR = process.env.LOCAL_DIR || ''; // se definido, lê os .zip locais (sem baixar)
 const UF = (process.env.UF || '').toUpperCase();
 const LIMIT = parseInt(process.env.LIMIT || '0', 10) || 0;
 const PARTS = (process.env.PARTS || '0,1,2,3,4,5,6,7,8,9').split(',').map((s) => s.trim()).filter(Boolean);
@@ -106,10 +107,16 @@ function buildEstabData(f, emp, muniMap, cnaeMap) {
 
 // --- download/stream -----------------------------------------------------
 
-/** Faz `curl -sL URL | funzip` e chama onLine(fields) para cada linha CSV. */
-function streamZipCsv(url, onLine) {
+/** Comando de origem: arquivo local (funzip) ou download (curl|funzip). */
+function srcCmd(file) {
+  if (LOCAL_DIR) return `funzip "${LOCAL_DIR.replace(/"/g, '')}/${file}"`;
+  return `curl -fsSL --retry 3 "${BASE}/${MES}/${file}" | funzip`;
+}
+
+/** Roda o comando shell (que emite o CSV) e chama onLine(fields) por linha. */
+function streamZipCsv(cmd, onLine) {
   return new Promise((resolve, reject) => {
-    const sh = spawn('bash', ['-c', `curl -fsSL --retry 3 "${url}" | funzip`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    const sh = spawn('bash', ['-c', cmd], { stdio: ['ignore', 'pipe', 'ignore'] });
     sh.stdout.setEncoding('latin1');
     const rl = readline.createInterface({ input: sh.stdout, crlfDelay: Infinity });
     let stopped = false;
@@ -125,18 +132,18 @@ function streamZipCsv(url, onLine) {
 }
 
 async function loadMap(file, onLine) {
-  const url = `${BASE}/${MES}/${file}`;
-  await streamZipCsv(url, onLine);
+  await streamZipCsv(srcCmd(file), onLine);
 }
 
 // --- main ----------------------------------------------------------------
 
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error('Defina DATABASE_URL.');
-  if (!MES) throw new Error('Defina MES (ex.: MES=2025-12).');
+  if (!LOCAL_DIR && !MES) throw new Error('Defina MES (ex.: MES=2025-12) ou LOCAL_DIR (pasta com os .zip).');
   await db.init(process.env.DATABASE_URL);
 
-  console.log(`Base: ${BASE}/${MES}  | UF=${UF || 'TODAS'} | PARTS=${PARTS.join(',')} | LIMIT=${LIMIT || '∞'}`);
+  const origem = LOCAL_DIR ? `LOCAL_DIR=${LOCAL_DIR}` : `${BASE}/${MES}`;
+  console.log(`Origem: ${origem}  | UF=${UF || 'TODAS'} | PARTS=${PARTS.join(',')} | LIMIT=${LIMIT || '∞'}`);
 
   // Tabelas de apoio
   const muniMap = {};
@@ -170,7 +177,7 @@ async function main() {
       batch = [];
     };
     let stop = false;
-    await streamZipCsv(`${BASE}/${MES}/Estabelecimentos${k}.zip`, (f) => {
+    await streamZipCsv(srcCmd(`Estabelecimentos${k}.zip`), (f) => {
       if (stop) return false;
       if (UF && f[19] !== UF) return;
       const d = buildEstabData(f, emp.get(f[0]), muniMap, cnaeMap);
