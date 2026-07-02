@@ -93,6 +93,69 @@ const GUIDES = [
       que já valida esses dados automaticamente.</p>
     `,
   },
+  {
+    slug: 'como-consultar-inscricao-estadual-cnpj',
+    title: 'Como consultar a Inscrição Estadual pelo CNPJ (passo a passo)',
+    description: 'Passo a passo para descobrir a Inscrição Estadual (IE) de uma empresa a partir do CNPJ, de graça e na hora, em qualquer estado.',
+    body: `
+      <p>Para <strong>consultar a Inscrição Estadual (IE) pelo CNPJ</strong> no SINTEGRA Brasil, o processo é
+      gratuito, não exige cadastro e funciona para <strong>todos os 27 estados</strong>.</p>
+      <h2>Passo a passo</h2>
+      <ol>
+        <li>Acesse a <a href="/">página inicial</a> do SINTEGRA Brasil.</li>
+        <li>Digite o <strong>CNPJ</strong> da empresa (14 dígitos; a formatação é automática).</li>
+        <li>Clique em <strong>Consultar</strong>.</li>
+        <li>Veja a <strong>Inscrição Estadual</strong>, a situação cadastral, o endereço, o CNAE e os demais dados públicos.</li>
+      </ol>
+      <h2>Dá para consultar a IE de qualquer estado?</h2>
+      <p>Sim. O resultado traz as inscrições de todas as UFs em que a empresa está cadastrada. Você pode filtrar por
+      um estado específico ou ver todas de uma vez.</p>
+      <h2>A consulta é gratuita?</h2>
+      <p>Sim, é totalmente gratuita e sem cadastro. Há um limite de 3 consultas por minuto por IP.</p>
+      <p><a href="/">➜ Consultar Inscrição Estadual por CNPJ agora</a></p>
+      <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Como consultar a Inscrição Estadual pelo CNPJ?","acceptedAnswer":{"@type":"Answer","text":"Acesse o SINTEGRA Brasil, informe o CNPJ da empresa e clique em Consultar. O resultado mostra a Inscrição Estadual, a situação cadastral e os dados públicos, em todos os estados."}},{"@type":"Question","name":"É gratuito consultar a IE pelo CNPJ?","acceptedAnswer":{"@type":"Answer","text":"Sim, a consulta é gratuita e não exige cadastro."}}]}</script>
+    `,
+  },
+  {
+    slug: 'como-baixar-danfe-xml-nfe',
+    title: 'Como baixar o DANFE e o XML da NF-e (grátis)',
+    description: 'Como gerar o DANFE em PDF e baixar o XML da NF-e — pela chave de acesso com certificado digital A1 ou a partir do XML que você já tem.',
+    body: `
+      <p>Existem duas formas de <strong>baixar o DANFE (PDF) e o XML da NF-e</strong> no SINTEGRA Brasil, ambas gratuitas.</p>
+      <h2>1. A partir do XML (no navegador)</h2>
+      <p>Se você já tem o arquivo <strong>XML</strong> da nota, acesse <a href="/nfe">Gerar DANFE</a>, selecione o
+      arquivo (ou cole o conteúdo) e clique em <strong>Gerar DANFE</strong>. O PDF é gerado <strong>no seu
+      navegador</strong> — o XML não é enviado a nenhum servidor.</p>
+      <h2>2. Pela chave de acesso (com certificado digital A1)</h2>
+      <p>Para baixar a nota <strong>pela chave de acesso</strong>, use o <a href="/agente">Agente SINTEGRA Brasil</a>
+      com o seu <strong>certificado A1</strong>. A nota é baixada direto da SEFAZ e a <strong>chave privada não sai
+      da sua máquina</strong>.</p>
+      <h2>De quem posso baixar a nota?</h2>
+      <p>Somente de notas em que o <strong>CNPJ do seu certificado é parte</strong> (emitente ou destinatário),
+      conforme as regras da SEFAZ.</p>
+      <p><a href="/nfe">➜ Gerar DANFE / baixar NF-e</a></p>
+      <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"Como baixar o DANFE em PDF?","acceptedAnswer":{"@type":"Answer","text":"Em sintegrabrasil.com.br/nfe você gera o DANFE em PDF a partir do XML, direto no navegador, ou baixa a nota pela chave de acesso usando certificado A1."}},{"@type":"Question","name":"Como baixar o XML da NF-e pela chave?","acceptedAnswer":{"@type":"Answer","text":"Use o Agente SINTEGRA Brasil com o certificado digital A1; a nota é baixada da SEFAZ e a chave privada não sai da sua máquina."}}]}</script>
+    `,
+  },
+  {
+    slug: 'mei-tem-inscricao-estadual',
+    title: 'MEI tem Inscrição Estadual?',
+    description: 'Entenda quando o MEI precisa de Inscrição Estadual (IE) e como verificar a IE de um MEI pelo CNPJ.',
+    body: `
+      <p>Depende da atividade. O <strong>MEI</strong> precisa de <strong>Inscrição Estadual</strong> quando exerce
+      atividade sujeita ao <strong>ICMS</strong> — comércio, indústria ou transporte intermunicipal/interestadual.</p>
+      <h2>Quando o MEI precisa de IE</h2>
+      <ul>
+        <li><strong>Precisa:</strong> comércio (venda de produtos), indústria, transporte de cargas.</li>
+        <li><strong>Não precisa:</strong> MEI que presta <strong>apenas serviços</strong> (recolhe ISS, imposto municipal).</li>
+      </ul>
+      <h2>Como verificar a IE de um MEI</h2>
+      <p>Basta <a href="/">consultar o CNPJ do MEI</a> aqui no SINTEGRA Brasil — se houver Inscrição Estadual, ela
+      aparece com a situação cadastral.</p>
+      <p><a href="/">➜ Verificar a Inscrição Estadual de um MEI</a></p>
+      <script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{"@type":"Question","name":"MEI tem Inscrição Estadual?","acceptedAnswer":{"@type":"Answer","text":"O MEI tem Inscrição Estadual quando exerce atividade sujeita ao ICMS (comércio, indústria ou transporte). MEI que presta apenas serviços, que recolhe ISS, geralmente não possui IE."}}]}</script>
+    `,
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -150,7 +213,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css?v=4" />
+  <link rel="stylesheet" href="/style.css?v=20" />
   ${bc}
   ${gaSnippet()}
 </head>
@@ -158,6 +221,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <header class="topbar">
     <div class="container">
       <a href="/" class="brand-home">
+        <span class="brand-name">Sintegra</span>
         <span class="badge">BR</span>
         <span class="brand-title">Consulta de Inscrição Estadual</span>
       </a>
@@ -170,10 +234,11 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <footer class="container footer">
     <p class="footer-links">
       <a href="/">Início</a> · <a href="/busca">Busca de empresas</a> ·
+      <a href="/nfe">Gerar DANFE</a> · <a href="/agente">Agente NF-e</a> ·
       <a href="/validar-inscricao-estadual">Validar IE</a> ·
       <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
       <a href="/incorporar">Incorporar</a> · <a href="/api">API</a><br />
-      <a href="/sobre">Sobre</a> · <a href="/contato">Contato</a> ·
+      <a href="/sobre">Sobre</a> · <a href="/sobre-os-dados">Fonte dos dados</a> · <a href="/contato">Contato</a> ·
       <a href="/privacidade">Privacidade</a> · <a href="/cookies">Cookies</a> · <a href="/termos">Termos</a>
     </p>
     ${statesNav()}
@@ -393,6 +458,64 @@ function buildSitemapXml(urls) {
     })
     .join('\n');
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</urlset>\n`;
+}
+
+/** llms.txt — resumo estruturado do site para modelos de IA (llmstxt.org). */
+function buildLlmsTxt() {
+  const g = (slug) => `${SITE_URL}/guias/${slug}`;
+  const ufLinks = UFS
+    .map((uf) => `- [Inscrição Estadual em ${UF_INFO[uf]} (${uf})](${SITE_URL}/sintegra/${uf.toLowerCase()})`)
+    .join('\n');
+  return `# SINTEGRA Brasil
+
+> Serviço online gratuito para consultar a Inscrição Estadual (IE) e os dados cadastrais públicos de empresas brasileiras a partir do CNPJ, em todos os 27 estados. Também gera o DANFE da NF-e (pelo XML ou pela chave de acesso com certificado digital A1), oferece busca de empresas por CNAE/estado/município e uma API pública.
+
+SINTEGRA Brasil é um serviço independente e privado (desenvolvido pela Spartan TI), sem vínculo com a Receita Federal, com as Secretarias da Fazenda (SEFAZ) estaduais ou com o portal oficial do SINTEGRA. Os dados cadastrais têm origem nos Dados Abertos da Receita Federal e são complementados, a cada consulta, pela API pública da CNPJ.ws (que agrega a Inscrição Estadual). O conteúdo tem caráter informativo; para fins oficiais, confirme no SINTEGRA/SEFAZ do respectivo estado.
+
+## Principais recursos
+- [Consulta de Inscrição Estadual por CNPJ](${SITE_URL}/): informe o CNPJ e veja a IE, a situação cadastral, o endereço, o CNAE e os dados públicos da empresa.
+- [Gerar DANFE e baixar a NF-e](${SITE_URL}/nfe): gera o DANFE em PDF a partir do XML (100% no navegador) ou baixa a NF-e pela chave de acesso usando certificado digital A1.
+- [Agente de certificado digital](${SITE_URL}/agente): programa local (Windows/Linux/macOS) que baixa a NF-e na SEFAZ com o certificado A1 sem enviar a chave privada a servidores.
+- [Busca de empresas por CNAE, estado e município](${SITE_URL}/busca): com mapa de calor por região.
+- [Validador de Inscrição Estadual](${SITE_URL}/validar-inscricao-estadual): valida a IE nos 27 estados.
+- [API pública (JSON)](${SITE_URL}/api): consulta de IE e dados cadastrais por CNPJ.
+
+## Guias (conteúdo educativo)
+${GUIDES.map((gd) => `- [${gd.title}](${SITE_URL}/guias/${gd.slug})`).join('\n')}
+
+## Consulta por estado
+${ufLinks}
+
+## Perguntas frequentes
+- **Como consultar a Inscrição Estadual pelo CNPJ?** Acesse ${SITE_URL}, digite o CNPJ e clique em Consultar; o resultado mostra a IE, a situação cadastral e os dados públicos, em todos os estados.
+- **Como descobrir a IE de uma empresa?** Basta o CNPJ — a consulta em ${SITE_URL} retorna a Inscrição Estadual de cada UF em que a empresa está cadastrada. Gratuito e sem cadastro.
+- **Como baixar o DANFE de uma nota fiscal?** Em ${SITE_URL}/nfe você gera o DANFE em PDF a partir do XML (no navegador) ou baixa a nota pela chave de acesso com certificado A1.
+- **Como baixar o XML da NF-e pela chave?** Use o Agente SINTEGRA Brasil (${SITE_URL}/agente) com seu certificado digital A1; a nota é baixada da SEFAZ e a chave privada não sai da sua máquina.
+- **Toda empresa tem Inscrição Estadual?** Não. Empresas exclusivamente de serviços (que recolhem ISS) geralmente não possuem IE.
+- **É gratuito?** Sim, todas as consultas e a geração de DANFE são gratuitas.
+
+## Institucional
+- [Sobre](${SITE_URL}/sobre)
+- [Metodologia e fonte dos dados](${SITE_URL}/sobre-os-dados)
+- [Contato](${SITE_URL}/contato)
+- [Política de Privacidade](${SITE_URL}/privacidade)
+- [Termos de Uso](${SITE_URL}/termos)
+
+## Fatos
+- Cobertura: todos os 27 estados (UFs) do Brasil.
+- Gratuito e sem cadastro.
+- Fonte dos dados cadastrais: Dados Abertos da Receita Federal; Inscrição Estadual via API pública CNPJ.ws.
+- Limite de uso: 3 consultas por minuto por IP.
+- Site: ${SITE_URL}
+`;
+}
+
+/** Índice de sitemaps (aponta para vários arquivos de sitemap). */
+function buildSitemapIndex(sitemaps) {
+  const body = sitemaps
+    .map((s) => `  <sitemap>\n    <loc>${s.loc}</loc>${s.lastmod ? `\n    <lastmod>${s.lastmod}</lastmod>` : ''}\n  </sitemap>`)
+    .join('\n');
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body}\n</sitemapindex>\n`;
 }
 
 // ---------------------------------------------------------------------------
@@ -826,6 +949,26 @@ function renderBusca() {
       <button type="submit">Buscar</button>
     </form>
 
+    <div id="mapa-card" class="mapa-card no-print">
+      <div class="mapa-head">
+        <strong>🗺️ Mapa de calor por região</strong>
+        <span id="mapa-info" class="muted"></span>
+      </div>
+      <div id="mapa-leaflet" class="mapa-leaflet" role="img" aria-label="Mapa de calor de empresas por região"></div>
+      <div class="mapa-legend">
+        <span>menos</span>
+        <i class="lg-bar"></i>
+        <span>mais</span>
+        <span class="mapa-zoomhint">· arraste para navegar, use + / − ou a roda do mouse para ampliar</span>
+      </div>
+      <p class="mapa-hint muted">Atualiza conforme o CNAE digitado acima. Sem CNAE, mostra toda a base.</p>
+    </div>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
     <div id="busca-status" class="busca-status" aria-live="polite"></div>
 
     <div id="busca-actions" class="result-actions no-print" hidden>
@@ -850,6 +993,7 @@ function renderBusca() {
 
     <p class="source">Resultados sobre a base já carregada. A Inscrição Estadual aparece ao abrir cada empresa
     (preenchida na consulta). Dados públicos, caráter informativo.</p>
+    <script src="/heatmap.js?v=3"></script>
     <script src="/busca.js?v=1"></script>`;
   return contentPage(
     '/busca',
@@ -858,6 +1002,226 @@ function renderBusca() {
     'Busca de empresas por CNAE, estado e município',
     inner,
     'Busca'
+  );
+}
+
+// --- DANFE: gerar PDF da NF-e a partir do XML ---
+function renderNfe() {
+  const inner = `
+    <p class="nfe-intro">Baixe a <strong>NF-e pela chave de acesso</strong> com seu <strong>certificado A1</strong>
+    e gere o <strong>DANFE em PDF</strong> — ou, se já tem o <strong>XML</strong>, gere o DANFE na hora.</p>
+
+    <div class="nfe-methods">
+      <section class="nfe-method no-print">
+        <div class="nfe-method-head">
+          <span class="nfe-num">1</span>
+          <div><h2>Baixar pela chave de acesso</h2>
+            <p class="muted">Com certificado <strong>A1</strong>, direto da SEFAZ. O certificado não sai do seu computador.</p></div>
+        </div>
+        <div id="agente-status" class="agente-badge">Verificando o agente…</div>
+        <div id="cert-form" hidden>
+          <input id="nfe-chave" class="nfe-chave-input" placeholder="Chave de acesso da NF-e (44 dígitos)" inputmode="numeric" maxlength="54" />
+          <div class="cert-row">
+            <label class="nfe-file-label"><input type="file" id="cert-pfx" accept=".pfx,.p12" /><span>🔑 Certificado (.pfx)</span></label>
+            <input id="cert-senha" type="password" placeholder="Senha do certificado" autocomplete="off" />
+            <select id="cert-amb"><option value="1">Produção</option><option value="2">Homologação</option></select>
+          </div>
+          <button type="button" id="cert-baixar" class="nfe-btn-primary">⬇ Baixar da SEFAZ</button>
+          <div id="cert-status" class="nfe-status" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <section class="nfe-method no-print">
+        <div class="nfe-method-head">
+          <span class="nfe-num nfe-num-alt">2</span>
+          <div><h2>Já tem o XML? Gere o DANFE</h2>
+            <p class="muted">100% no seu navegador — o XML não é enviado ao servidor.</p></div>
+        </div>
+        <label class="nfe-file-label"><input type="file" id="nfe-file" accept=".xml,text/xml,application/xml" /><span>📄 Selecionar arquivo XML</span></label>
+        <p class="muted" style="margin:10px 0 6px">ou cole o conteúdo do XML:</p>
+        <textarea id="nfe-xml" rows="4" placeholder="<nfeProc ...> ... </nfeProc>" spellcheck="false"></textarea>
+        <div class="nfe-actions">
+          <button type="button" id="nfe-gerar">Gerar DANFE</button>
+          <button type="button" id="nfe-pdf" class="act-btn" hidden>⬇ Baixar PDF</button>
+        </div>
+        <div id="nfe-status" class="nfe-status" aria-live="polite"></div>
+      </section>
+    </div>
+
+    <div id="nfe-out" class="nfe-out" hidden></div>
+
+    <p class="source no-print">O DANFE é um documento auxiliar e não substitui a NF-e. Só é possível baixar notas
+    em que o CNPJ do certificado é parte (emitente/destinatário). Para validar a autenticidade, use a chave no
+    <a href="https://www.nfe.fazenda.gov.br/portal/consultaRecaptcha.aspx" target="_blank" rel="noopener">portal nacional da NF-e</a>.</p>
+    <script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'HowTo',
+      name: 'Como gerar o DANFE da NF-e em PDF',
+      description: 'Gere o DANFE em PDF pela chave de acesso (com certificado A1) ou a partir do XML.',
+      step: [
+        { '@type': 'HowToStep', name: 'Pela chave de acesso', text: 'Baixe a nota pela chave usando o certificado A1 no Agente SINTEGRA Brasil.' },
+        { '@type': 'HowToStep', name: 'Ou pelo XML', text: 'Se já tem o XML, selecione o arquivo ou cole o conteúdo.' },
+        { '@type': 'HowToStep', name: 'Gerar e baixar', text: 'Clique em Gerar DANFE e depois em Baixar PDF.' },
+      ],
+    })}</script>
+    <script src="/nfe.js?v=6"></script>`;
+  return contentPage(
+    '/nfe',
+    'Baixar NF-e e DANFE pela chave de acesso — SINTEGRA Brasil',
+    'Baixe a NF-e pela chave de acesso com seu certificado digital A1 e gere o DANFE em PDF. Ou gere o DANFE a partir do XML, direto no navegador. Gratuito.',
+    'Baixar NF-e e gerar DANFE (PDF)',
+    inner,
+    'DANFE / NF-e'
+  );
+}
+
+// --- Página de download + tutorial do Agente ---
+const AGENTE_BASE = 'https://github.com/spartanti/consulta-inscricao-estadual/releases/download/agente-v0.1.0/';
+const AGENTE_DOWNLOAD = AGENTE_BASE + 'agente-nfe.exe';
+
+function renderAgente() {
+  const faqs = [
+    ['Preciso de certificado digital?', 'Sim. É necessário um certificado <strong>A1</strong> (arquivo <code>.pfx</code>/<code>.p12</code>) e a senha. Suporte a <strong>A3 (token/cartão)</strong> está no roteiro.'],
+    ['Meu certificado fica seguro?', 'Fica. O agente roda <strong>só no seu computador</strong> — o certificado e a senha <strong>não são enviados para a internet</strong>. O site conversa com o agente apenas em <code>localhost</code>.'],
+    ['De quem posso baixar notas?', 'Das notas em que o <strong>CNPJ do seu certificado é parte</strong> — normalmente como <strong>destinatário</strong> (ou emitente). Terceiros e transportadoras só com autorização via <code>autXML</code> na nota.'],
+    ['Consigo baixar a nota de um fornecedor?', 'Sim, desde que a sua empresa seja a <strong>destinatária</strong> daquela NF-e. Caso contrário, a SEFAZ devolve apenas o resumo.'],
+    ['É gratuito?', 'Sim, o agente e a geração do DANFE são <strong>gratuitos</strong>.'],
+    ['Preciso instalar alguma coisa?', 'Não. É um <strong>executável portátil</strong> — basta baixar e abrir. Não precisa de Node nem de instalador.'],
+    ['Funciona no Mac/Linux?', 'Por enquanto <strong>Windows 64-bit</strong>. Versões para Mac e Linux podem ser disponibilizadas depois.'],
+    ['O antivírus acusou o arquivo. É vírus?', 'Não. É um <strong>falso-positivo</strong> comum em programas novos ainda <strong>não assinados</strong>. O código é aberto e pode ser conferido.'],
+  ];
+  const faqHtml = faqs.map((f) => `<details class="faq-item"><summary>${f[0]}</summary><div>${f[1]}</div></details>`).join('');
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.map((f) => ({
+      '@type': 'Question',
+      name: f[0],
+      acceptedAnswer: { '@type': 'Answer', text: f[1].replace(/<[^>]+>/g, '') },
+    })),
+  };
+
+  const inner = `
+    <div class="ag-hero">
+      <p class="ag-lead">Baixe o <strong>XML e o DANFE em PDF</strong> da NF-e pela <strong>chave de acesso</strong>
+      usando o seu <strong>certificado digital A1</strong> — direto da SEFAZ, com segurança. O certificado
+      <strong>nunca sai da sua máquina</strong>.</p>
+      <div class="agente-dl no-print">
+        <a class="agente-btn" href="${AGENTE_DOWNLOAD}" rel="nofollow">⬇ Baixar o Agente — Windows</a>
+        <span class="ag-os muted">Outros sistemas:
+          <a href="${AGENTE_BASE}agente-nfe-linux" rel="nofollow">Linux</a> ·
+          <a href="${AGENTE_BASE}agente-nfe-mac" rel="nofollow">macOS</a></span>
+      </div>
+      <p class="muted" style="margin:6px 0 0">Grátis · 64-bit · sem instalação. No Linux/macOS, rode:
+        <code>chmod +x agente-nfe-linux &amp;&amp; ./agente-nfe-linux</code></p>
+    </div>
+
+    <div class="feature-cards">
+      <div class="feature-card"><span class="fc-ico">🧾</span><strong>DANFE em PDF</strong>
+        <span>Visualize, salve e imprima o DANFE da nota em segundos.</span></div>
+      <div class="feature-card"><span class="fc-ico">🔐</span><strong>XML com certificado</strong>
+        <span>Baixe o XML autorizado direto da SEFAZ com o seu A1 — a chave privada fica no seu PC.</span></div>
+      <div class="feature-card"><span class="fc-ico">⚡</span><strong>Rápido e gratuito</strong>
+        <span>Sem cadastro, sem mensalidade. Informe a chave e pronto.</span></div>
+    </div>
+
+    <h2 class="sec-title">Como funciona — passo a passo</h2>
+    <ol class="agente-passos">
+      <li><strong>Baixe</strong> o agente no botão acima e <strong>abra</strong> o <code>agente-nfe.exe</code>.</li>
+      <li>Se o Windows mostrar <em>"O Windows protegeu o seu PC"</em>, clique em <strong>"Mais informações"</strong>
+        › <strong>"Executar assim mesmo"</strong> (normal em programa novo).</li>
+      <li>Abre uma <strong>janela</strong> escrito <em>"Agente rodando…"</em>. <strong>Deixe aberta</strong> enquanto usar.</li>
+      <li>Vá em <a href="/nfe">Gerar DANFE</a> › aparece <strong>"✓ Agente detectado"</strong>.</li>
+      <li>Informe a <strong>chave (44 dígitos)</strong>, selecione o <strong>.pfx (A1)</strong>, a <strong>senha</strong>
+        e clique em <strong>Baixar da SEFAZ</strong>.</li>
+      <li>O DANFE aparece › clique em <strong>Baixar PDF</strong>. 🎉</li>
+    </ol>
+
+    <h2 class="sec-title">Certificado digital aceito</h2>
+    <p>É preciso o certificado de <strong>uma das partes da nota</strong> (emitente, destinatário ou terceiro autorizado):</p>
+    <ul>
+      <li>✅ <strong>A1</strong> — arquivo <code>.pfx</code>/<code>.p12</code> (com senha). <em>Disponível.</em></li>
+      <li>🔜 <strong>A3</strong> — token USB ou cartão. <em>Em breve.</em></li>
+    </ul>
+
+    <h2 class="sec-title">Comunicado aos emitentes</h2>
+    <p>Para que a sua <strong>transportadora ou contador</strong> baixe a NF-e com o certificado deles, inclua o CNPJ
+    autorizado na tag <code>autXML</code> ao emitir a nota. Sem isso, apenas emitente e destinatário obtêm o XML
+    completo — os demais recebem só o resumo.</p>
+
+    <h2 class="sec-title">Dúvidas frequentes</h2>
+    <div class="faq-list">${faqHtml}</div>
+    <script type="application/ld+json">${JSON.stringify(faqSchema)}</script>
+    <script type="application/ld+json">${JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'HowTo',
+      name: 'Como baixar a NF-e com certificado digital A1',
+      step: [
+        { '@type': 'HowToStep', name: 'Baixar o agente', text: 'Baixe o Agente SINTEGRA Brasil e abra o programa.' },
+        { '@type': 'HowToStep', name: 'Executar', text: 'Permita a execução no Windows e deixe a janela aberta.' },
+        { '@type': 'HowToStep', name: 'Informar os dados', text: 'Na página de NF-e, informe a chave de acesso, o certificado A1 e a senha.' },
+        { '@type': 'HowToStep', name: 'Baixar', text: 'Clique em Baixar da SEFAZ e gere o DANFE em PDF.' },
+      ],
+    })}</script>
+
+    <p class="source">Alternativa sem certificado: <a href="/nfe">gerar o DANFE a partir do XML</a> que você já tem.
+    Agente em <strong>beta</strong>, ainda não assinado digitalmente. Só baixa notas em que o CNPJ do certificado é
+    parte, conforme regras da SEFAZ.</p>`;
+  return contentPage(
+    '/agente',
+    'Baixar NF-e e DANFE com certificado digital — Agente SINTEGRA Brasil',
+    'Baixe o XML e o DANFE da NF-e pela chave de acesso usando seu certificado A1, direto da SEFAZ. Grátis, seguro (o certificado não sai da sua máquina) e com tutorial passo a passo.',
+    'Baixar NF-e e DANFE com certificado digital',
+    inner,
+    'Agente'
+  );
+}
+
+// --- Metodologia / fonte dos dados ---
+function renderMetodologia() {
+  const inner = `
+    <p>Transparência sobre <strong>de onde vêm os dados</strong> do SINTEGRA Brasil, como são atualizados e quais
+    são os limites de uso.</p>
+
+    <h2>Fontes dos dados</h2>
+    <ul>
+      <li><strong>Base cadastral:</strong> <a href="https://dados.gov.br" target="_blank" rel="noopener">Dados Abertos
+        da Receita Federal</a> (CNPJ) — razão social, nome fantasia, situação cadastral, endereço, CNAE, natureza jurídica e porte.</li>
+      <li><strong>Inscrição Estadual (IE):</strong> obtida via <a href="https://www.cnpj.ws" target="_blank" rel="noopener">API
+        pública CNPJ.ws</a>, que agrega as inscrições estaduais das SEFAZ.</li>
+      <li><strong>NF-e (DANFE por certificado):</strong> web service <strong>NFeDistribuicaoDFe</strong> da SEFAZ
+        (Ambiente Nacional), acessado localmente com o certificado A1 do próprio usuário.</li>
+    </ul>
+
+    <h2>Como os dados são atualizados</h2>
+    <p>A base cadastral (Receita Federal) é carregada periodicamente. A cada <strong>consulta</strong>, os dados da
+    empresa são <strong>enriquecidos e atualizados</strong> pela API CNPJ.ws — incluindo a Inscrição Estadual e a
+    situação mais recente. Ou seja: a base dá a cobertura, e a consulta traz o dado fresco.</p>
+
+    <h2>Cobertura</h2>
+    <p>Todos os <strong>27 estados</strong> (26 UFs + Distrito Federal). A base nacional de empresas está em
+    expansão contínua.</p>
+
+    <h2>Limites e avisos</h2>
+    <ul>
+      <li>Conteúdo com <strong>caráter informativo</strong>. Para fins oficiais, confirme no SINTEGRA/SEFAZ do estado.</li>
+      <li>A situação detalhada da IE (habilitada, bloqueada, etc.) é definida por cada SEFAZ; aqui indicamos se está ativa.</li>
+      <li>Limite de <strong>3 consultas por minuto por IP</strong> na API pública.</li>
+    </ul>
+
+    <h2>Independência</h2>
+    <p>O SINTEGRA Brasil é um serviço <strong>independente e privado</strong> (Spartan TI), <strong>sem vínculo</strong>
+    com a Receita Federal, com as SEFAZ estaduais ou com o portal oficial do SINTEGRA.</p>
+
+    <p class="source">Dúvidas sobre os dados? <a href="/contato">Fale com a gente</a>. Veja também a
+    <a href="/privacidade">Política de Privacidade</a>.</p>`;
+  return contentPage(
+    '/sobre-os-dados',
+    'Metodologia e fonte dos dados — SINTEGRA Brasil',
+    'De onde vêm os dados do SINTEGRA Brasil: base cadastral da Receita Federal (Dados Abertos) e Inscrição Estadual via CNPJ.ws. Como são atualizados, cobertura e limites.',
+    'Metodologia e fonte dos dados',
+    inner,
+    'Metodologia'
   );
 }
 
@@ -934,6 +1298,9 @@ module.exports = {
   CAPITAIS,
   ATIVIDADES,
   renderBusca,
+  renderNfe,
+  renderAgente,
+  renderMetodologia,
   renderCookies,
   renderApiDocs,
   maskCnpj,
@@ -953,4 +1320,6 @@ module.exports = {
   renderWidget,
   renderEmbed,
   buildSitemapXml,
+  buildSitemapIndex,
+  buildLlmsTxt,
 };

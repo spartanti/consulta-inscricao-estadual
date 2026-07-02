@@ -1,0 +1,22 @@
+{
+  "name": "agente-nfe-sintegrabrasil",
+  "version": "0.1.0",
+  "description": "Agente local do SINTEGRA Brasil: baixa a NF-e na SEFAZ (Distribuição DF-e) usando o certificado A1 do cliente, sem enviar a chave privada a servidores externos.",
+  "main": "agente.js",
+  "bin": "agente.js",
+  "scripts": {
+    "start": "node agente.js",
+    "build:win": "pkg . --targets node18-win-x64 --output dist/agente-nfe.exe",
+    "build:mac": "pkg . --targets node18-macos-x64 --output dist/agente-nfe-mac",
+    "build:linux": "pkg . --targets node18-linux-x64 --output dist/agente-nfe-linux"
+  },
+  "pkg": {
+    "assets": []
+  },
+  "dependencies": {
+    "node-forge": "^1.3.1"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}

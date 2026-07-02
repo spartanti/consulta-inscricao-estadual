@@ -99,8 +99,8 @@ function renderIe(data) {
       ? '<span class="tag on">Ativa</span>'
       : '<span class="tag off">Baixada/Inativa</span>';
     // Quando exibindo todos os estados, mostra a UF de cada inscrição.
-    const ufBadge = !ufSel && ie.uf ? `<span class="ie-uf">${ie.uf}</span>` : '';
-    div.innerHTML = `${ufBadge}<span>${ie.inscricao_estadual}</span>${tag}`;
+    const ufBadge = !ufSel && ie.uf ? `<span class="ie-uf">${esc(ie.uf)}</span>` : '';
+    div.innerHTML = `${ufBadge}<span>${esc(ie.inscricao_estadual)}</span>${tag}`;
     box.appendChild(div);
   });
 }
@@ -172,7 +172,7 @@ function renderResult(data) {
   // CNAE principal
   const cnaeP = document.getElementById('r-cnae-principal');
   if (data.atividade_principal) {
-    cnaeP.innerHTML = `<span class="cnae-cod">${data.atividade_principal.codigo}</span> ${data.atividade_principal.descricao}`;
+    cnaeP.innerHTML = `<span class="cnae-cod">${esc(data.atividade_principal.codigo)}</span> ${esc(data.atividade_principal.descricao)}`;
   } else {
     cnaeP.textContent = '—';
   }
@@ -187,7 +187,7 @@ function renderResult(data) {
     document.getElementById('cnae-sec-count').textContent = sec.length;
     sec.forEach((c) => {
       const li = document.createElement('li');
-      li.innerHTML = `<span class="cnae-cod">${c.codigo}</span> ${c.descricao}`;
+      li.innerHTML = `<span class="cnae-cod">${esc(c.codigo)}</span> ${esc(c.descricao)}`;
       secList.appendChild(li);
     });
   } else {
@@ -231,7 +231,7 @@ function renderSocios(socios) {
     const meta = [s.qualificacao, s.faixa_etaria, s.data_entrada ? `desde ${s.data_entrada}` : null]
       .filter(Boolean)
       .join(' · ');
-    li.innerHTML = `<strong>${s.nome || '—'}</strong><span class="socio-meta">${meta}</span>`;
+    li.innerHTML = `<strong>${esc(s.nome || '—')}</strong><span class="socio-meta">${esc(meta)}</span>`;
     ul.appendChild(li);
   });
 }
@@ -260,6 +260,8 @@ form.addEventListener('submit', async (e) => {
     clearStatus();
     renderResult(data);
     afterResult(data);
+    // Leva o usuário direto ao quadro do resultado.
+    requestAnimationFrame(() => resultEl.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     if (window.gtag) {
       gtag('event', 'consulta_cnpj', { event_category: 'consulta', tem_ie: (data.inscricoes_estaduais || []).length > 0 });
     }
@@ -271,10 +273,9 @@ form.addEventListener('submit', async (e) => {
 });
 
 // ===========================================================================
-// Histórico, favoritos (localStorage) e exportação (CSV / PDF)
+// Histórico (localStorage) e exportação (CSV / PDF)
 // ===========================================================================
 const LS_HIST = 'sb_hist';
-const LS_FAV = 'sb_fav';
 
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -292,46 +293,11 @@ function pushHistory(data) {
   h.unshift(e);
   lsSet(LS_HIST, h.slice(0, 10));
 }
-function isFav(cnpj) { return lsGet(LS_FAV).some((x) => x.cnpj === cnpj); }
-function toggleFav(data) {
-  const e = entryFrom(data);
-  let f = lsGet(LS_FAV);
-  if (f.some((x) => x.cnpj === e.cnpj)) f = f.filter((x) => x.cnpj !== e.cnpj);
-  else { f.unshift(e); f = f.slice(0, 20); }
-  lsSet(LS_FAV, f);
-}
-
-function renderSaved() {
-  const favEl = document.getElementById('fav-list');
-  const box = document.getElementById('saved');
-  if (!favEl || !box) return;
-  const li = (e) => `<li><a href="/cnpj/${e.cnpj}">${esc(e.razao || maskCnpj(e.cnpj))}</a> <span class="muted">${maskCnpj(e.cnpj)}${e.uf ? ' · ' + esc(e.uf) : ''}</span></li>`;
-  const fav = lsGet(LS_FAV);
-  favEl.innerHTML = fav.length ? fav.map(li).join('') : '<li class="muted">Nenhum favorito ainda.</li>';
-  // Coluna de "Consultas recentes" foi ocultada; renderiza só se existir.
-  const histEl = document.getElementById('hist-list');
-  if (histEl) {
-    const hist = lsGet(LS_HIST);
-    histEl.innerHTML = hist.length ? hist.map(li).join('') : '<li class="muted">Nenhuma consulta ainda.</li>';
-  }
-  box.hidden = !fav.length;
-}
-
-function updateFavBtn(cnpj) {
-  const b = document.getElementById('btn-fav');
-  if (!b) return;
-  const on = isFav(cnpj);
-  b.textContent = on ? '★ Favorito' : '☆ Favoritar';
-  b.classList.toggle('on', on);
-}
-
 function afterResult(data) {
   const cnpj = (data.cnpj || '').replace(/\D/g, '');
   const link = document.getElementById('btn-link');
   if (link && cnpj.length === 14) link.href = '/cnpj/' + cnpj;
-  updateFavBtn(cnpj);
   pushHistory(data);
-  renderSaved();
   fetchContador();
 }
 
@@ -368,12 +334,9 @@ function exportCsv(data) {
 
 // Wiring dos botões (uma vez)
 (function wireActions() {
-  const fav = document.getElementById('btn-fav');
   const pdf = document.getElementById('btn-pdf');
   const csv = document.getElementById('btn-csv');
-  if (fav) fav.addEventListener('click', () => { if (!lastData) return; toggleFav(lastData); updateFavBtn((lastData.cnpj || '').replace(/\D/g, '')); renderSaved(); });
   if (pdf) pdf.addEventListener('click', () => window.print());
   if (csv) csv.addEventListener('click', () => { if (lastData) exportCsv(lastData); });
-  renderSaved();
   fetchContador();
 })();

@@ -170,6 +170,15 @@ async function count() {
   return r.rows[0].c;
 }
 
+/** CNPJs em bloco (para o sitemap), ordenados de forma estável pela PK. */
+async function listCnpjsChunk(offset, limit) {
+  const r = await pool.query(
+    'SELECT cnpj FROM empresas ORDER BY cnpj OFFSET $1 LIMIT $2',
+    [Math.max(offset, 0), Math.min(limit, 50000)]
+  );
+  return r.rows.map((x) => x.cnpj);
+}
+
 /** Busca filtrada (consulta por CNAE/UF/municipio). */
 async function search(f = {}) {
   const where = [];
@@ -198,8 +207,63 @@ async function search(f = {}) {
   return r.rows;
 }
 
+/**
+ * Mapa de calor: contagem de empresas por UF (opcionalmente filtrado por CNAE).
+ * Query leve (27 linhas) que usa o índice de cnae_codigo quando o filtro é código.
+ */
+async function statsByUf(f = {}) {
+  const where = [];
+  const params = [];
+  let i = 1;
+  const cnae = (f.cnae || '').trim();
+  if (cnae) {
+    if (/^[\d.\-/\s]+$/.test(cnae)) {
+      // parece código: prefixo sobre cnae_codigo, como está (ex.: "5611" ou "5611-2/03")
+      where.push(`cnae_codigo LIKE $${i++}`);
+      params.push(cnae + '%');
+    } else {
+      where.push(hasUnaccent ? `unaccent(cnae_descricao) ILIKE unaccent($${i++})` : `cnae_descricao ILIKE $${i++}`);
+      params.push('%' + cnae + '%');
+    }
+  }
+  const sql =
+    'SELECT uf, COUNT(*)::int AS c FROM empresas' +
+    (where.length ? ' WHERE ' + where.join(' AND ') : '') +
+    ' GROUP BY uf';
+  const r = await pool.query(sql, params);
+  const ufs = {};
+  for (const row of r.rows) if (row.uf) ufs[row.uf] = row.c;
+  return ufs;
+}
+
+/**
+ * Mapa de calor real: contagem de empresas por MUNICÍPIO (uf + municipio),
+ * opcionalmente filtrado por CNAE. Cada linha vira um ponto de calor no mapa.
+ */
+async function statsByMunicipio(f = {}) {
+  const where = ['municipio IS NOT NULL'];
+  const params = [];
+  let i = 1;
+  const cnae = (f.cnae || '').trim();
+  if (cnae) {
+    if (/^[\d.\-/\s]+$/.test(cnae)) {
+      where.push(`cnae_codigo LIKE $${i++}`);
+      params.push(cnae + '%');
+    } else {
+      where.push(hasUnaccent ? `unaccent(cnae_descricao) ILIKE unaccent($${i++})` : `cnae_descricao ILIKE $${i++}`);
+      params.push('%' + cnae + '%');
+    }
+  }
+  const sql =
+    'SELECT uf, municipio, COUNT(*)::int AS c FROM empresas WHERE ' +
+    where.join(' AND ') +
+    ' GROUP BY uf, municipio';
+  const r = await pool.query(sql, params);
+  return r.rows;
+}
+
 async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, search, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, close };

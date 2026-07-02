@@ -24,6 +24,17 @@ const CACHE_DIR = path.join(DATA_DIR, 'cnpj');
 // Garante o diretorio de dados (no volume persistente, usado pelo contador).
 fs.mkdirSync(CACHE_DIR, { recursive: true });
 
+// Coordenadas de municipios (UF|NOME_NORMALIZADO -> [lat, lng]) para o mapa de calor.
+let MUNI_COORDS = {};
+try {
+  MUNI_COORDS = JSON.parse(fs.readFileSync(path.join(__dirname, 'municipios-coords.json'), 'utf8'));
+} catch (e) {
+  console.error('municipios-coords.json nao carregado:', e.message);
+}
+function normMuni(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+}
+
 // ---------------------------------------------------------------------------
 // Utilitarios de CNPJ
 // ---------------------------------------------------------------------------
@@ -296,8 +307,12 @@ function counterInc() {
 // ---------------------------------------------------------------------------
 
 function clientIp(req) {
-  const xff = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  return xff || (req.socket && req.socket.remoteAddress) || 'unknown';
+  // Atrás do proxy da Railway, o IP real é o ÚLTIMO valor do X-Forwarded-For
+  // (acrescentado pelo proxy confiável). Usar o primeiro permitiria que o
+  // cliente forjasse o header e furasse o rate-limit.
+  const parts = String(req.headers['x-forwarded-for'] || '')
+    .split(',').map((s) => s.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : (req.socket && req.socket.remoteAddress) || 'unknown';
 }
 
 function setCors(res) {
@@ -306,9 +321,47 @@ function setCors(res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
 
+// Rotas feitas para serem incorporadas em outros sites (iframe).
+const EMBED_PATHS = new Set(['/widget', '/widget/', '/incorporar', '/incorporar/']);
+
+/** Cabeçalhos de segurança aplicados a todas as respostas. */
+function setSecurityHeaders(res, pathname) {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=()');
+  // O widget precisa ser embutido em qualquer site; o resto, não (anti-clickjacking).
+  const embed = EMBED_PATHS.has(pathname);
+  const frameAncestors = embed ? '*' : "'self'";
+  if (!embed) res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com",
+      "style-src 'self' 'unsafe-inline' https://unpkg.com",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com http://127.0.0.1:54345 http://localhost:54345",
+      "font-src 'self' data:",
+      'frame-ancestors ' + frameAncestors,
+    ].join('; ')
+  );
+}
+
 const rlHits = new Map(); // ip -> [timestamps]
 const RL_LIMIT = 30; // req por janela
 const RL_WINDOW = 60000; // 60s
+
+// Cache em memória do mapa de calor (contagens mudam pouco).
+const mapaCache = new Map(); // cnae -> { t, data }
+const heatCache = new Map(); // cnae -> { t, data } (pontos por município)
+const MAPA_TTL = 6 * 3600 * 1000; // 6 horas
+
+// Sitemap
+const SM_CHUNK = 50000; // URLs por arquivo de sitemap (limite do protocolo)
+let sitemapIndexCache = null; // { t, xml }
 
 function rateLimitOk(ip) {
   const now = Date.now();
@@ -388,11 +441,28 @@ function serveStatic(req, res) {
   });
 }
 
+// Confiabilidade: loga erros não tratados sem derrubar o processo.
+process.on('unhandledRejection', (err) => {
+  console.error('[unhandledRejection]', (err && err.message) || err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', (err && err.message) || err);
+});
+
+const START_TS = Date.now();
+
 const server = http.createServer(async (req, res) => {
   const isHead = req.method === 'HEAD';
   const isGet = req.method === 'GET' || isHead;
   const urlObj = new URL(req.url, `http://${req.headers.host}`);
   const pathname = decodeURIComponent(urlObj.pathname);
+
+  setSecurityHeaders(res, pathname);
+
+  // Healthcheck (monitoramento/uptime)
+  if (pathname === '/health' || pathname === '/healthz') {
+    return sendJson(res, 200, { status: 'ok', uptime_s: Math.round((Date.now() - START_TS) / 1000) });
+  }
 
   // Preflight CORS para a API pública
   if (req.method === 'OPTIONS' && pathname.startsWith('/api/')) {
@@ -447,6 +517,67 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // API PÚBLICA: mapa de calor por UF (contagem de empresas, opcional por CNAE)
+  if (req.method === 'GET' && pathname === '/api/v1/mapa') {
+    setCors(res);
+    const cnae = (urlObj.searchParams.get('cnae') || '').trim();
+    const key = cnae.toLowerCase();
+    const now = Date.now();
+    const hit = mapaCache.get(key);
+    if (hit && now - hit.t < MAPA_TTL) return sendJson(res, 200, hit.data);
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
+    }
+    try {
+      const ufs = await db.statsByUf({ cnae });
+      let total = 0;
+      let max = 0;
+      for (const k in ufs) { total += ufs[k]; if (ufs[k] > max) max = ufs[k]; }
+      const data = { cnae, ufs, total, max };
+      mapaCache.set(key, { t: now, data });
+      if (mapaCache.size > 500) mapaCache.clear();
+      return sendJson(res, 200, data);
+    } catch (e) {
+      return sendJson(res, 500, { erro: 'Erro ao gerar mapa.' });
+    }
+  }
+
+  // API PÚBLICA: mapa de calor REAL por município (pontos lat/lng + contagem)
+  if (req.method === 'GET' && pathname === '/api/v1/heatmap') {
+    setCors(res);
+    const cnae = (urlObj.searchParams.get('cnae') || '').trim();
+    const key = cnae.toLowerCase();
+    const now = Date.now();
+    const hit = heatCache.get(key);
+    if (hit && now - hit.t < MAPA_TTL) return sendJson(res, 200, hit.data);
+    // cache miss = query pesada: protege contra DoS por CNAE aleatório
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
+    }
+    try {
+      const rows = await db.statsByMunicipio({ cnae });
+      const points = [];
+      let max = 0;
+      let total = 0;
+      for (const row of rows) {
+        const c = MUNI_COORDS[row.uf + '|' + normMuni(row.municipio)];
+        total += row.c;
+        if (!c) continue;
+        if (row.c > max) max = row.c;
+        // [lat, lng, contagem] — arredonda p/ payload menor
+        points.push([c[0], c[1], row.c]);
+      }
+      const data = { cnae, points, max, total, municipios: points.length };
+      heatCache.set(key, { t: now, data });
+      if (heatCache.size > 300) heatCache.clear();
+      return sendJson(res, 200, data);
+    } catch (e) {
+      return sendJson(res, 500, { erro: 'Erro ao gerar mapa.' });
+    }
+  }
+
   // API: GET /api/consulta?cnpj=...
   if (req.method === 'GET' && pathname === '/api/consulta') {
     const cnpj = onlyDigits(urlObj.searchParams.get('cnpj'));
@@ -467,11 +598,36 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (isGet) {
-    // Sitemap dinamico (home + estados + guias + consultas + CNPJs cacheados)
+    // Sitemap: ÍNDICE apontando p/ páginas SEO + blocos de CNPJ (toda a base)
     if (pathname === '/sitemap.xml') {
-      const recent = await listRecent(5000);
+      const now = Date.now();
+      if (!sitemapIndexCache || now - sitemapIndexCache.t >= MAPA_TTL) {
+        let total = 0;
+        try { total = await db.count(); } catch (e) {}
+        const nChunks = Math.max(1, Math.ceil(total / SM_CHUNK));
+        const today = new Date().toISOString().slice(0, 10);
+        const sitemaps = [{ loc: `${seo.SITE_URL}/sitemap-paginas.xml`, lastmod: today }];
+        for (let k = 1; k <= nChunks; k++) {
+          sitemaps.push({ loc: `${seo.SITE_URL}/sitemap-cnpj-${k}.xml`, lastmod: today });
+        }
+        sitemapIndexCache = { t: now, xml: seo.buildSitemapIndex(sitemaps) };
+      }
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(isHead ? undefined : sitemapIndexCache.xml);
+    }
+
+    // llms.txt — resumo do site para modelos de IA (ChatGPT/Perplexity/Gemini)
+    if (pathname === '/llms.txt') {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'public, max-age=86400' });
+      return res.end(isHead ? undefined : seo.buildLlmsTxt());
+    }
+
+    // Sitemap de páginas institucionais / SEO
+    if (pathname === '/sitemap-paginas.xml') {
       const urls = [
         { loc: `${seo.SITE_URL}/`, priority: '1.0', lastmod: new Date().toISOString().slice(0, 10) },
+        { loc: `${seo.SITE_URL}/nfe`, priority: '0.8' },
+        { loc: `${seo.SITE_URL}/agente`, priority: '0.7' },
         { loc: `${seo.SITE_URL}/busca`, priority: '0.8' },
         { loc: `${seo.SITE_URL}/validar-inscricao-estadual`, priority: '0.7' },
         { loc: `${seo.SITE_URL}/api`, priority: '0.6' },
@@ -480,6 +636,7 @@ const server = http.createServer(async (req, res) => {
         { loc: `${seo.SITE_URL}/incorporar`, priority: '0.5' },
         { loc: `${seo.SITE_URL}/consultas`, priority: '0.4' },
         { loc: `${seo.SITE_URL}/sobre`, priority: '0.4' },
+        { loc: `${seo.SITE_URL}/sobre-os-dados`, priority: '0.5' },
         { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/privacidade`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/termos`, priority: '0.3' },
@@ -488,8 +645,19 @@ const server = http.createServer(async (req, res) => {
         ...seo.CAPITAIS.map((c) => ({ loc: `${seo.SITE_URL}/cidade/${c.slug}`, priority: '0.6' })),
         ...seo.ATIVIDADES.map((a) => ({ loc: `${seo.SITE_URL}/atividade/${a.slug}`, priority: '0.6' })),
         ...seo.GUIDES.map((g) => ({ loc: `${seo.SITE_URL}/guias/${g.slug}`, priority: '0.6' })),
-        ...recent.map((c) => ({ loc: `${seo.SITE_URL}/cnpj/${c.cnpj}`, priority: '0.5' })),
       ];
+      res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
+      return res.end(isHead ? undefined : seo.buildSitemapXml(urls));
+    }
+
+    // Sitemap de CNPJs em bloco: /sitemap-cnpj-<n>.xml
+    let smM = pathname.match(/^\/sitemap-cnpj-(\d+)\.xml$/);
+    if (smM) {
+      const k = parseInt(smM[1], 10) || 1;
+      let cnpjs = [];
+      try { cnpjs = await db.listCnpjsChunk((k - 1) * SM_CHUNK, SM_CHUNK); } catch (e) {}
+      if (!cnpjs.length) { res.writeHead(404, { 'Content-Type': 'application/xml; charset=utf-8' }); return res.end(isHead ? undefined : '<?xml version="1.0"?><urlset/>'); }
+      const urls = cnpjs.map((c) => ({ loc: `${seo.SITE_URL}/cnpj/${c}`, priority: '0.5' }));
       res.writeHead(200, { 'Content-Type': 'application/xml; charset=utf-8' });
       return res.end(isHead ? undefined : seo.buildSitemapXml(urls));
     }
@@ -554,6 +722,21 @@ const server = http.createServer(async (req, res) => {
     // Busca por CNAE/UF/município
     if (pathname === '/busca' || pathname === '/busca/') {
       return sendHtml(res, 200, seo.renderBusca(), isHead);
+    }
+
+    // DANFE: gerar PDF da NF-e a partir do XML
+    if (pathname === '/nfe' || pathname === '/nfe/' || pathname === '/danfe' || pathname === '/danfe/') {
+      return sendHtml(res, 200, seo.renderNfe(), isHead);
+    }
+
+    // Download + tutorial do Agente (certificado digital)
+    if (pathname === '/agente' || pathname === '/agente/') {
+      return sendHtml(res, 200, seo.renderAgente(), isHead);
+    }
+
+    // Metodologia / fonte dos dados
+    if (pathname === '/sobre-os-dados' || pathname === '/sobre-os-dados/') {
+      return sendHtml(res, 200, seo.renderMetodologia(), isHead);
     }
 
     // Documentação da API pública

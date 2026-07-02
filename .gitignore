@@ -7,3 +7,7 @@ npm-debug.log*
 
 # cache de consultas (efêmero, não versionar)
 data/
+
+# binários do agente (grandes; distribuídos via GitHub Releases)
+agente-nfe/dist/
+agente-nfe/node_modules/

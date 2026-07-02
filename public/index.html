@@ -5,8 +5,8 @@
   <!-- Analytics carregado só após consentimento (LGPD) -->
   <script src="/consent.js?v=2" defer></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Consulta de Inscrição Estadual (IE) por CNPJ — SINTEGRA Brasil</title>
-  <meta name="description" content="Consulte gratuitamente a Inscrição Estadual (IE) de empresas de todos os estados do Brasil informando o CNPJ. Resultado na hora, com situação cadastral e dados públicos." />
+  <title>Consulta de CNPJ e Inscrição Estadual, situação cadastral e dados de empresas — SINTEGRA Brasil</title>
+  <meta name="description" content="Consulte grátis o CNPJ e a Inscrição Estadual (IE) de empresas de todo o Brasil: situação cadastral, endereço, CNAE e dados públicos. Valide a IE, pesquise empresas por atividade e gere o DANFE da NF-e." />
   <meta name="robots" content="index, follow, max-image-preview:large" />
   <meta name="author" content="SINTEGRA Brasil" />
   <link rel="canonical" href="https://www.sintegrabrasil.com.br/" />
@@ -19,18 +19,18 @@
 
   <!-- Open Graph / redes sociais -->
   <meta property="og:type" content="website" />
-  <meta property="og:title" content="Consulta de Inscrição Estadual (IE) por CNPJ — SINTEGRA Brasil" />
-  <meta property="og:description" content="Consulte gratuitamente a Inscrição Estadual de empresas de todo o Brasil pelo CNPJ. Resultado na hora." />
+  <meta property="og:title" content="Consulta de CNPJ e Inscrição Estadual — SINTEGRA Brasil" />
+  <meta property="og:description" content="Consulte grátis o CNPJ e a Inscrição Estadual de empresas de todo o Brasil: situação cadastral, endereço, CNAE e dados públicos. Valide IE, pesquise empresas e gere o DANFE." />
   <meta property="og:url" content="https://www.sintegrabrasil.com.br/" />
   <meta property="og:locale" content="pt_BR" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="https://www.sintegrabrasil.com.br/og-image.svg" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Consulta de Inscrição Estadual por CNPJ — SINTEGRA Brasil" />
-  <meta name="twitter:description" content="Consulte a Inscrição Estadual de empresas de todo o Brasil pelo CNPJ. Grátis e na hora." />
+  <meta name="twitter:title" content="Consulta de CNPJ e Inscrição Estadual — SINTEGRA Brasil" />
+  <meta name="twitter:description" content="Consulte grátis o CNPJ e a Inscrição Estadual de empresas do Brasil: situação cadastral, dados públicos, validação de IE e DANFE." />
   <meta name="twitter:image" content="https://www.sintegrabrasil.com.br/og-image.svg" />
 
-  <link rel="stylesheet" href="/style.css?v=4" />
+  <link rel="stylesheet" href="/style.css?v=20" />
   <link rel="manifest" href="/manifest.webmanifest" />
 
   <!-- Dados estruturados (Schema.org) -->
@@ -68,6 +68,14 @@
         "operatingSystem": "Web",
         "browserRequirements": "Requer JavaScript",
         "inLanguage": "pt-BR",
+        "featureList": [
+          "Consulta de CNPJ",
+          "Consulta de Inscrição Estadual (IE) por CNPJ",
+          "Situação cadastral da empresa",
+          "Validação de Inscrição Estadual",
+          "Pesquisa de empresas por CNAE, estado e município",
+          "Geração de DANFE e download da NF-e"
+        ],
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "BRL" }
       },
       {
@@ -97,6 +105,21 @@
             "@type": "Question",
             "name": "Toda empresa tem Inscrição Estadual?",
             "acceptedAnswer": { "@type": "Answer", "text": "Não. Empresas exclusivamente prestadoras de serviços, que recolhem ISS em vez de ICMS, geralmente não possuem Inscrição Estadual." }
+          },
+          {
+            "@type": "Question",
+            "name": "O SINTEGRA Brasil é oficial?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Não. O SINTEGRA Brasil é um serviço independente e privado que consulta dados públicos de empresas. Não é o portal oficial do SINTEGRA nem um site do governo." }
+          },
+          {
+            "@type": "Question",
+            "name": "Como consultar uma empresa pelo CNPJ?",
+            "acceptedAnswer": { "@type": "Answer", "text": "Digite o CNPJ no campo de busca e clique em Consultar. Você verá a razão social, a Inscrição Estadual, a situação cadastral, o endereço e a atividade (CNAE) da empresa." }
+          },
+          {
+            "@type": "Question",
+            "name": "Como saber se uma empresa está ativa?",
+            "acceptedAnswer": { "@type": "Answer", "text": "A consulta mostra a situação cadastral (ativa, baixada, inapta, etc.) e indica se a Inscrição Estadual está ativa em cada estado." }
           }
         ]
       }
@@ -105,11 +128,17 @@
   </script>
 </head>
 <body>
+  <a class="skip-link" href="#cnpj">Ir para a consulta</a>
   <header class="topbar">
     <div class="container">
-      <span class="badge">BR</span>
-      <h1>Consulta de Inscrição Estadual</h1>
-      <p class="subtitle">Empresas de todo o Brasil · busca por CNPJ</p>
+      <div class="brand-line"><span class="brand-name">Sintegra</span> <span class="badge">BR</span></div>
+      <h1>Consulta de CNPJ, Inscrição Estadual e Situação Cadastral</h1>
+      <p class="subtitle">Descubra a Inscrição Estadual, a situação cadastral e os dados de empresas de todo o Brasil pelo CNPJ — grátis</p>
+      <div class="trustbar">
+        <span><strong>3,7 mi+</strong> empresas</span>
+        <span><strong>27</strong> estados</span>
+        <span><strong>Grátis</strong> · sem cadastro</span>
+      </div>
     </div>
   </header>
 
@@ -135,6 +164,66 @@
       <p class="aviso-limite"><span class="aviso-ico">i</span> Limite de <strong>3 consultas por minuto por IP</strong>. Aguarde alguns segundos entre as buscas.</p>
     </section>
 
+    <!-- O que o site faz (mensagem clara + palavras-chave, crawlable) -->
+    <section class="card usecases" aria-label="O que você pode fazer no SINTEGRA Brasil">
+      <h2>O que você pode consultar aqui</h2>
+      <p>O <strong>SINTEGRA Brasil</strong> é uma alternativa gratuita e rápida ao portal oficial do SINTEGRA para
+      consultar dados públicos de empresas de <strong>todo o Brasil</strong> a partir do <strong>CNPJ</strong>:</p>
+      <ul class="usecases-list">
+        <li>🔎 <strong>Consultar CNPJ e Inscrição Estadual (IE)</strong> — use a busca acima: razão social, situação cadastral, endereço, CNAE e a IE dos 27 estados.</li>
+        <li>📋 <strong>Ver a situação cadastral</strong> da empresa (ativa, baixada, etc.).</li>
+        <li>✅ <a href="/validar-inscricao-estadual">Validar uma Inscrição Estadual</a> em qualquer estado.</li>
+        <li>🏢 <a href="/busca">Pesquisar empresas por atividade (CNAE), estado e município</a>, com mapa de calor.</li>
+        <li>🧾 <a href="/nfe">Gerar o DANFE e baixar a NF-e</a> pela chave de acesso ou pelo XML.</li>
+      </ul>
+      <p class="usecases-transp">Consultamos <strong>dados públicos</strong> de empresas. Não somos o portal oficial do SINTEGRA nem um site do governo — veja a <a href="/sobre-os-dados">fonte dos dados</a>.</p>
+    </section>
+
+    <!-- Card: gerar DANFE da NF-e a partir do XML -->
+    <a class="card nfe-card no-print" href="/nfe">
+      <span class="nfe-card-ico">🧾</span>
+      <span class="nfe-card-text">
+        <strong>Baixar DANFE da NF-e em PDF</strong>
+        <span>Tem o XML de uma nota fiscal? Gere o PDF do DANFE na hora — direto no seu navegador, sem enviar nada.</span>
+      </span>
+      <span class="nfe-card-cta">Gerar PDF</span>
+    </a>
+
+    <!-- Card de produtos afiliados: Mercado Livre -->
+    <section class="card ml-card no-print" aria-label="Ofertas Mercado Livre">
+      <div class="ml-head">
+        <span class="ml-brand">Ofertas no <strong>Mercado&nbsp;Livre</strong></span>
+        <span class="ml-tag">Publicidade</span>
+      </div>
+      <div class="ml-grid">
+        <a class="ml-tile" href="https://meli.la/1qK21Jp" target="_blank" rel="sponsored noopener" onclick="window.gtag&&gtag('event','click_ml_afiliado',{item:1});" title="Cadeira Escritório Presidente Ergonômica Nr17 Marqs Home Arcanis Preta Mesh Premium">
+          <span class="ml-thumb"><img src="https://http2.mlstatic.com/D_NQ_NP_892750-MLA110183247129_042026-O.webp" alt="Cadeira Escritório Presidente Ergonômica NR17 Mesh" loading="lazy" referrerpolicy="no-referrer" /></span>
+          <span class="ml-name">Cadeira Escritório Presidente Ergonômica NR17 Mesh</span>
+          <span class="ml-buy">Comprar</span>
+        </a>
+        <a class="ml-tile" href="https://meli.la/11F8cCF" target="_blank" rel="sponsored noopener" onclick="window.gtag&&gtag('event','click_ml_afiliado',{item:2});" title="Impressora Monocromática Bematech MP-4200 HS Serial USB Ethernet">
+          <span class="ml-thumb"><img src="https://http2.mlstatic.com/D_NQ_NP_752746-MLA99473948736_112025-O.webp" alt="Impressora Bematech MP-4200 HS" loading="lazy" referrerpolicy="no-referrer" /></span>
+          <span class="ml-name">Impressora Bematech MP-4200 HS (USB/Ethernet)</span>
+          <span class="ml-buy">Comprar</span>
+        </a>
+        <a class="ml-tile" href="https://meli.la/26wkHw5" target="_blank" rel="sponsored noopener" onclick="window.gtag&&gtag('event','click_ml_afiliado',{item:3});" title="Notebook Lenovo IdeaPad 1 15IRU7 Intel Core i3-1315U 8GB 256GB SSD Windows 11 15.6 Cloud Grey">
+          <span class="ml-thumb"><img src="https://http2.mlstatic.com/D_NQ_NP_718154-MLA99988492837_112025-O.webp" alt="Notebook Lenovo IdeaPad 1 i3 8GB 256GB SSD W11" loading="lazy" referrerpolicy="no-referrer" /></span>
+          <span class="ml-name">Notebook Lenovo IdeaPad 1 i3 8GB 256GB SSD W11</span>
+          <span class="ml-buy">Comprar</span>
+        </a>
+        <a class="ml-tile" href="https://meli.la/2fXN9HR" target="_blank" rel="sponsored noopener" onclick="window.gtag&&gtag('event','click_ml_afiliado',{item:4});" title="Impressora Multifuncional Brother DCP-T530DW Tank WiFi Preto 127V">
+          <span class="ml-thumb"><img src="https://http2.mlstatic.com/D_NQ_NP_631934-MLA104663476723_012026-O.webp" alt="Impressora Multifuncional Brother DCP-T530DW Tank WiFi" loading="lazy" referrerpolicy="no-referrer" /></span>
+          <span class="ml-name">Impressora Multifuncional Brother DCP-T530DW Tank WiFi</span>
+          <span class="ml-buy">Comprar</span>
+        </a>
+        <a class="ml-tile" href="https://meli.la/1DHiFtE" target="_blank" rel="sponsored noopener" onclick="window.gtag&&gtag('event','click_ml_afiliado',{item:5});" title="Mesa de Computador Escrivaninha Preta Pé Metalon Industrial 120x60 JM3 Móveis">
+          <span class="ml-thumb"><img src="https://http2.mlstatic.com/D_NQ_NP_798985-MLA109046020278_032026-O.webp" alt="Mesa de Computador Escrivaninha 120x60 Metalon" loading="lazy" referrerpolicy="no-referrer" /></span>
+          <span class="ml-name">Mesa Computador Escrivaninha 120x60 Metalon</span>
+          <span class="ml-buy">Comprar</span>
+        </a>
+      </div>
+    </section>
+
     <!-- Banner publicitário: TagPlus (link de afiliado) -->
     <a
       class="adbanner"
@@ -156,13 +245,6 @@
       </div>
     </a>
 
-    <section id="saved" class="card saved-box no-print" hidden>
-      <div class="saved-col">
-        <h2 class="saved-title">★ Favoritos</h2>
-        <ul id="fav-list" class="saved-list"></ul>
-      </div>
-    </section>
-
     <section id="status" class="status" aria-live="polite" hidden></section>
 
     <section id="result" class="card result" hidden>
@@ -175,7 +257,6 @@
       </div>
 
       <div class="result-actions no-print">
-        <button type="button" id="btn-fav" class="act-btn" title="Salvar nos favoritos">☆ Favoritar</button>
         <button type="button" id="btn-pdf" class="act-btn">⬇ Salvar PDF</button>
         <button type="button" id="btn-csv" class="act-btn">⬇ Baixar CSV</button>
         <a id="btn-link" class="act-btn" href="#">🔗 Página da empresa</a>
@@ -309,8 +390,32 @@
           <summary>Os dados são oficiais?</summary>
           <p>Os dados têm caráter informativo e vêm de bases públicas. Para fins oficiais, confirme no SINTEGRA da SEFAZ do estado correspondente.</p>
         </details>
+        <details>
+          <summary>O SINTEGRA Brasil é oficial?</summary>
+          <p>Não. O SINTEGRA Brasil é um serviço <strong>independente e privado</strong> que consulta dados públicos de empresas. <strong>Não é o portal oficial do SINTEGRA</strong> nem um site do governo.</p>
+        </details>
+        <details>
+          <summary>Como consultar uma empresa pelo CNPJ?</summary>
+          <p>Digite o CNPJ no campo de busca e clique em Consultar. Você verá a razão social, a Inscrição Estadual, a situação cadastral, o endereço e a atividade (CNAE) da empresa.</p>
+        </details>
+        <details>
+          <summary>Como saber se uma empresa está ativa?</summary>
+          <p>A consulta mostra a <strong>situação cadastral</strong> (ativa, baixada, inapta, etc.) e indica se a Inscrição Estadual está ativa em cada estado.</p>
+        </details>
       </div>
     </article>
+
+    <section class="card links-internos" aria-label="Consultar empresas por estado, cidade e atividade">
+      <h2>Consultar empresas por estado, cidade e atividade</h2>
+      <h3>Inscrição Estadual por estado</h3>
+      <div class="li-grid">
+        <a href="/sintegra/ac">Acre</a> <a href="/sintegra/al">Alagoas</a> <a href="/sintegra/ap">Amapá</a> <a href="/sintegra/am">Amazonas</a> <a href="/sintegra/ba">Bahia</a> <a href="/sintegra/ce">Ceará</a> <a href="/sintegra/df">Distrito Federal</a> <a href="/sintegra/es">Espírito Santo</a> <a href="/sintegra/go">Goiás</a> <a href="/sintegra/ma">Maranhão</a> <a href="/sintegra/mt">Mato Grosso</a> <a href="/sintegra/ms">Mato Grosso do Sul</a> <a href="/sintegra/mg">Minas Gerais</a> <a href="/sintegra/pa">Pará</a> <a href="/sintegra/pb">Paraíba</a> <a href="/sintegra/pr">Paraná</a> <a href="/sintegra/pe">Pernambuco</a> <a href="/sintegra/pi">Piauí</a> <a href="/sintegra/rj">Rio de Janeiro</a> <a href="/sintegra/rn">Rio Grande do Norte</a> <a href="/sintegra/rs">Rio Grande do Sul</a> <a href="/sintegra/ro">Rondônia</a> <a href="/sintegra/rr">Roraima</a> <a href="/sintegra/sc">Santa Catarina</a> <a href="/sintegra/sp">São Paulo</a> <a href="/sintegra/se">Sergipe</a> <a href="/sintegra/to">Tocantins</a>
+      </div>
+      <h3>Empresas por atividade (CNAE)</h3>
+      <div class="li-grid">
+        <a href="/atividade/comercio-varejista">Comércio varejista</a> <a href="/atividade/comercio-atacadista">Comércio atacadista</a> <a href="/atividade/industria">Indústria</a> <a href="/atividade/restaurantes">Restaurantes</a> <a href="/atividade/supermercados">Supermercados</a> <a href="/atividade/farmacias">Farmácias</a> <a href="/atividade/autopecas">Autopeças</a> <a href="/atividade/vestuario">Vestuário</a> <a href="/atividade/materiais-de-construcao">Materiais de construção</a> <a href="/atividade/comercio-de-veiculos">Veículos</a> <a href="/atividade/ecommerce">E-commerce</a> <a href="/atividade/transporte-de-cargas">Transporte de cargas</a>
+      </div>
+    </section>
 
     <p class="source">
       Fonte: API pública <strong>CNPJ.ws</strong> (dados da Receita Federal e SEFAZ).
@@ -349,7 +454,7 @@
     <small>Desenvolvido por <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">Spartan TI</a></small>
   </footer>
 
-  <script src="/app.js?v=2"></script>
+  <script src="/app.js?v=5"></script>
   <script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('/sw.js').catch(function(){});});}</script>
 </body>
 </html>
