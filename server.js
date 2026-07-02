@@ -13,6 +13,8 @@ const http = require('http');
 const https = require('https');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
+const geoip = require('geoip-lite');
 const seo = require('./seo');
 const db = require('./db');
 
@@ -374,6 +376,31 @@ async function flushMetrics() {
 }
 setInterval(flushMetrics, 30000).unref();
 
+// Visitantes: IP -> hash salgado (pseudonimização LGPD) + cidade/UF via geoip offline.
+// NÃO armazena o IP puro; guarda só a localização aproximada e um hash não-reversível.
+const GEO_SALT = process.env.GEO_SALT || process.env.STATS_KEY || 'sintegrabrasil-geo-v1';
+const visitorBuf = new Map(); // dia|hash -> { dia, ip_hash, uf, cidade }
+function trackVisitor(req) {
+  try {
+    const ip = clientIp(req);
+    if (!ip || ip === 'unknown') return;
+    const dia = new Date().toISOString().slice(0, 10);
+    const ipHash = crypto.createHash('sha256').update(GEO_SALT + '|' + ip).digest('hex').slice(0, 24);
+    const key = dia + '|' + ipHash;
+    if (visitorBuf.has(key)) return;
+    const g = geoip.lookup(ip) || {};
+    visitorBuf.set(key, { dia, ip_hash: ipHash, uf: g.region || null, cidade: g.city || null });
+    if (visitorBuf.size > 3000) flushVisitors();
+  } catch (e) { /* best-effort */ }
+}
+async function flushVisitors() {
+  if (!visitorBuf.size) return;
+  const rows = Array.from(visitorBuf.values());
+  visitorBuf.clear();
+  try { await db.saveVisitorsBatch(rows); } catch (e) {}
+}
+setInterval(flushVisitors, 30000).unref();
+
 function rateLimitOk(ip) {
   const now = Date.now();
   const arr = (rlHits.get(ip) || []).filter((t) => now - t < RL_WINDOW);
@@ -473,6 +500,12 @@ const server = http.createServer(async (req, res) => {
   // Healthcheck (monitoramento/uptime)
   if (pathname === '/health' || pathname === '/healthz') {
     return sendJson(res, 200, { status: 'ok', uptime_s: Math.round((Date.now() - START_TS) / 1000) });
+  }
+
+  // Rastreio de visitante (só páginas humanas: sem /api, sem assets, sem /health|/stats)
+  if (isGet && !pathname.startsWith('/api/') && !/\.[a-z0-9]+$/i.test(pathname) &&
+      pathname !== '/health' && pathname !== '/healthz' && pathname !== '/stats' && pathname !== '/stats/') {
+    trackVisitor(req);
   }
 
   // Preflight CORS para a API pública
@@ -779,8 +812,9 @@ const server = http.createServer(async (req, res) => {
       }
       try {
         await flushMetrics();
-        const [rows, daily] = await Promise.all([db.getMetrics(), db.getMetricsDaily(14)]);
-        return sendHtml(res, 200, seo.renderStats(rows, daily, counterGet()), isHead);
+        await flushVisitors();
+        const [rows, daily, geo] = await Promise.all([db.getMetrics(), db.getMetricsDaily(14), db.getGeoStats()]);
+        return sendHtml(res, 200, seo.renderStats(rows, daily, counterGet(), geo), isHead);
       } catch (e) {
         return sendHtml(res, 500, '<h1>Erro ao carregar métricas</h1>', isHead);
       }

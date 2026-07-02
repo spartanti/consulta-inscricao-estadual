@@ -53,6 +53,16 @@ async function init(connStr) {
       PRIMARY KEY (dia, metrica)
     );
   `);
+  // Visitantes (pseudonimizado: IP -> hash salgado; guarda só cidade/UF, nunca o IP puro)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS visitors (
+      dia     DATE NOT NULL,
+      ip_hash TEXT NOT NULL,
+      uf      TEXT,
+      cidade  TEXT,
+      PRIMARY KEY (dia, ip_hash)
+    );
+  `);
   // unaccent permite busca de município sem depender de acentos.
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS unaccent');
@@ -302,8 +312,43 @@ async function getMetricsDaily(days = 14) {
   return r.rows;
 }
 
+/** Grava visitantes do dia em lote (dedupe por dia+ip_hash). */
+async function saveVisitorsBatch(rows) {
+  if (!rows || !rows.length) return;
+  const tuples = [];
+  const params = [];
+  rows.forEach((r, i) => {
+    const b = i * 4;
+    tuples.push(`($${b + 1}::date,$${b + 2},$${b + 3},$${b + 4})`);
+    params.push(r.dia, r.ip_hash, r.uf || null, r.cidade || null);
+  });
+  await pool.query(
+    `INSERT INTO visitors (dia, ip_hash, uf, cidade) VALUES ${tuples.join(',')}
+     ON CONFLICT (dia, ip_hash) DO NOTHING`,
+    params
+  );
+}
+
+/** Estatísticas geográficas: usuários únicos + top cidades + por UF. */
+async function getGeoStats() {
+  const u = await pool.query(`
+    SELECT
+      COUNT(DISTINCT ip_hash) FILTER (WHERE dia = CURRENT_DATE)::int AS hoje,
+      COUNT(DISTINCT ip_hash) FILTER (WHERE dia > CURRENT_DATE - 7)::int AS d7,
+      COUNT(DISTINCT ip_hash) FILTER (WHERE dia > CURRENT_DATE - 30)::int AS d30,
+      COUNT(DISTINCT ip_hash)::int AS total
+    FROM visitors`);
+  const cid = await pool.query(`
+    SELECT COALESCE(cidade,'—') AS cidade, COALESCE(uf,'—') AS uf, COUNT(DISTINCT ip_hash)::int AS n
+    FROM visitors WHERE dia > CURRENT_DATE - 30 GROUP BY cidade, uf ORDER BY n DESC LIMIT 15`);
+  const ufs = await pool.query(`
+    SELECT COALESCE(uf,'—') AS uf, COUNT(DISTINCT ip_hash)::int AS n
+    FROM visitors WHERE dia > CURRENT_DATE - 30 GROUP BY uf ORDER BY n DESC LIMIT 27`);
+  return { uniq: u.rows[0], cidades: cid.rows, ufs: ufs.rows };
+}
+
 async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, close };

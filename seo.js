@@ -1226,7 +1226,7 @@ function renderMetodologia() {
 }
 
 // --- Painel de métricas (analytics de primeira mão) ---
-function renderStats(rows, daily, total) {
+function renderStats(rows, daily, total, geo) {
   const LBL = {
     consulta_web: 'Consultas no site (home)',
     consulta_api: 'Consultas via API',
@@ -1244,6 +1244,24 @@ function renderStats(rows, daily, total) {
     `<tr><td>${escapeHtml(LBL[r.metrica] || r.metrica)}</td><td class="r">${fmt(r.hoje)}</td><td class="r">${fmt(r.d7)}</td><td class="r">${fmt(r.d30)}</td><td class="r"><strong>${fmt(r.total)}</strong></td></tr>`
   ).join('');
   const dtr = (daily || []).map((d) => `<tr><td>${escapeHtml(d.dia)}</td><td class="r">${fmt(d.total)}</td></tr>`).join('');
+  const g = geo || { uniq: {}, cidades: [], ufs: [] };
+  const cidTr = (g.cidades || []).map((c) => `<tr><td>${escapeHtml(c.cidade)}</td><td>${escapeHtml(c.uf)}</td><td class="r">${fmt(c.n)}</td></tr>`).join('');
+  const ufTr = (g.ufs || []).map((u) => `<tr><td>${escapeHtml(u.uf)}</td><td class="r">${fmt(u.n)}</td></tr>`).join('');
+  const geoHtml = `
+<h2>Usuários únicos (localização aproximada por IP)</h2>
+<p class="muted">IP pseudonimizado por hash — o IP puro não é armazenado. Hoje: <strong>${fmt(g.uniq.hoje)}</strong> · 7 dias: <strong>${fmt(g.uniq.d7)}</strong> · 30 dias: <strong>${fmt(g.uniq.d30)}</strong> · total: <strong>${fmt(g.uniq.total)}</strong>.</p>
+<div style="display:flex;gap:24px;flex-wrap:wrap">
+  <div style="flex:2;min-width:280px">
+    <h3>Top cidades (30 dias)</h3>
+    <table class="st-table"><thead><tr><th>Cidade</th><th>UF</th><th class="r">Usuários</th></tr></thead>
+    <tbody>${cidTr || '<tr><td colspan="3">Ainda sem dados.</td></tr>'}</tbody></table>
+  </div>
+  <div style="flex:1;min-width:200px">
+    <h3>Por estado (30 dias)</h3>
+    <table class="st-table"><thead><tr><th>UF</th><th class="r">Usuários</th></tr></thead>
+    <tbody>${ufTr || '<tr><td colspan="2">—</td></tr>'}</tbody></table>
+  </div>
+</div>`;
   return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
 <meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Métricas de uso — SINTEGRA Brasil</title><link rel="stylesheet" href="/style.css">
@@ -1254,6 +1272,7 @@ function renderStats(rows, daily, total) {
 <h2>Por origem</h2>
 <table class="st-table"><thead><tr><th>Métrica</th><th class="r">Hoje</th><th class="r">7 dias</th><th class="r">30 dias</th><th class="r">Total</th></tr></thead>
 <tbody>${tr || '<tr><td colspan="5">Ainda sem dados coletados.</td></tr>'}</tbody></table>
+${geoHtml}
 <h2>Últimos 14 dias (todos os eventos)</h2>
 <table class="st-table"><thead><tr><th>Dia</th><th class="r">Eventos</th></tr></thead>
 <tbody>${dtr || '<tr><td colspan="2">—</td></tr>'}</tbody></table>
