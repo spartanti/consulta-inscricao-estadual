@@ -1225,6 +1225,42 @@ function renderMetodologia() {
   );
 }
 
+// --- Painel de métricas (analytics de primeira mão) ---
+function renderStats(rows, daily, total) {
+  const LBL = {
+    consulta_web: 'Consultas no site (home)',
+    consulta_api: 'Consultas via API',
+    consulta_widget: 'Consultas via widget/incorporado',
+    busca_api: 'Buscas de empresas',
+    mapa: 'Mapa de calor',
+    pagina_cnpj: 'Páginas de empresa (/cnpj)',
+    pagina_nfe: 'Página NF-e / DANFE',
+    pagina_agente: 'Página do agente',
+    pagina_busca: 'Página de busca',
+    widget_load: 'Widget carregado',
+  };
+  const fmt = (n) => Number(n || 0).toLocaleString('pt-BR');
+  const tr = (rows || []).map((r) =>
+    `<tr><td>${escapeHtml(LBL[r.metrica] || r.metrica)}</td><td class="r">${fmt(r.hoje)}</td><td class="r">${fmt(r.d7)}</td><td class="r">${fmt(r.d30)}</td><td class="r"><strong>${fmt(r.total)}</strong></td></tr>`
+  ).join('');
+  const dtr = (daily || []).map((d) => `<tr><td>${escapeHtml(d.dia)}</td><td class="r">${fmt(d.total)}</td></tr>`).join('');
+  return `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="robots" content="noindex,nofollow"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Métricas de uso — SINTEGRA Brasil</title><link rel="stylesheet" href="/style.css">
+<style>.st-table{width:100%;border-collapse:collapse;margin:10px 0 24px}.st-table th,.st-table td{border:1px solid #e4e8ee;padding:8px 10px;font-size:14px;text-align:left}.st-table th{background:#eef2f7;color:#0a3d62}.st-table .r{text-align:right}</style>
+</head><body><main class="container" style="padding:24px 16px">
+<h1>📊 Métricas de uso</h1>
+<p class="muted">Analytics de primeira mão (independente do Google Analytics). Total acumulado de consultas: <strong>${fmt(total)}</strong>.</p>
+<h2>Por origem</h2>
+<table class="st-table"><thead><tr><th>Métrica</th><th class="r">Hoje</th><th class="r">7 dias</th><th class="r">30 dias</th><th class="r">Total</th></tr></thead>
+<tbody>${tr || '<tr><td colspan="5">Ainda sem dados coletados.</td></tr>'}</tbody></table>
+<h2>Últimos 14 dias (todos os eventos)</h2>
+<table class="st-table"><thead><tr><th>Dia</th><th class="r">Eventos</th></tr></thead>
+<tbody>${dtr || '<tr><td colspan="2">—</td></tr>'}</tbody></table>
+<p class="muted">Para proteger esta página, defina a variável de ambiente <code>STATS_KEY</code> e acesse <code>/stats?k=SUA_CHAVE</code>.</p>
+</main></body></html>`;
+}
+
 // --- Documentação da API pública ---
 function renderApiDocs() {
   const ex = `${SITE_URL}/api/v1/cnpj/00000000000191`;
@@ -1301,6 +1337,7 @@ module.exports = {
   renderNfe,
   renderAgente,
   renderMetodologia,
+  renderStats,
   renderCookies,
   renderApiDocs,
   maskCnpj,

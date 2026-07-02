@@ -44,6 +44,15 @@ async function init(connStr) {
   await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_municipio ON empresas(municipio);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_cnae ON empresas(cnae_codigo);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_updated ON empresas(updated_at DESC);');
+  // Métricas de uso (analytics de primeira mão, por origem)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS metrics (
+      dia     DATE NOT NULL,
+      metrica TEXT NOT NULL,
+      n       BIGINT NOT NULL DEFAULT 0,
+      PRIMARY KEY (dia, metrica)
+    );
+  `);
   // unaccent permite busca de município sem depender de acentos.
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS unaccent');
@@ -262,8 +271,39 @@ async function statsByMunicipio(f = {}) {
   return r.rows;
 }
 
+/** Incrementa uma métrica de uso do dia (analytics de primeira mão). */
+async function bumpMetric(metrica, n) {
+  await pool.query(
+    `INSERT INTO metrics (dia, metrica, n) VALUES (CURRENT_DATE, $1, $2)
+     ON CONFLICT (dia, metrica) DO UPDATE SET n = metrics.n + EXCLUDED.n`,
+    [String(metrica).slice(0, 60), n || 1]
+  );
+}
+
+/** Agregado por métrica: hoje, 7d, 30d, total. */
+async function getMetrics() {
+  const r = await pool.query(`
+    SELECT metrica,
+      COALESCE(SUM(n) FILTER (WHERE dia = CURRENT_DATE), 0)::int AS hoje,
+      COALESCE(SUM(n) FILTER (WHERE dia > CURRENT_DATE - 7), 0)::int AS d7,
+      COALESCE(SUM(n) FILTER (WHERE dia > CURRENT_DATE - 30), 0)::int AS d30,
+      COALESCE(SUM(n), 0)::int AS total
+    FROM metrics GROUP BY metrica ORDER BY total DESC`);
+  return r.rows;
+}
+
+/** Série diária (todas as métricas somadas) dos últimos N dias. */
+async function getMetricsDaily(days = 14) {
+  const r = await pool.query(
+    `SELECT to_char(dia, 'YYYY-MM-DD') AS dia, SUM(n)::int AS total
+     FROM metrics WHERE dia > CURRENT_DATE - ($1::int) GROUP BY dia ORDER BY dia DESC`,
+    [days]
+  );
+  return r.rows;
+}
+
 async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, close };

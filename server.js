@@ -363,6 +363,17 @@ const MAPA_TTL = 6 * 3600 * 1000; // 6 horas
 const SM_CHUNK = 50000; // URLs por arquivo de sitemap (limite do protocolo)
 let sitemapIndexCache = null; // { t, xml }
 
+// Métricas de uso (buffer em memória; flush periódico no Postgres p/ evitar 1 write por request)
+const metricBuf = new Map();
+function bump(m, n) { metricBuf.set(m, (metricBuf.get(m) || 0) + (n || 1)); }
+async function flushMetrics() {
+  if (!metricBuf.size) return;
+  const entries = Array.from(metricBuf.entries());
+  metricBuf.clear();
+  for (const [m, n] of entries) { try { await db.bumpMetric(m, n); } catch (e) {} }
+}
+setInterval(flushMetrics, 30000).unref();
+
 function rateLimitOk(ip) {
   const now = Date.now();
   const arr = (rlHits.get(ip) || []).filter((t) => now - t < RL_WINDOW);
@@ -484,6 +495,9 @@ const server = http.createServer(async (req, res) => {
     try {
       const data = await getCnpjData(cnpj);
       counterInc();
+      const org = req.headers.origin || req.headers.referer || '';
+      const externo = org && !/sintegrabrasil\.com\.br|localhost|127\.0\.0\.1/.test(org);
+      bump(externo ? 'consulta_widget' : 'consulta_api');
       return sendJson(res, 200, publicView(data));
     } catch (e) {
       return sendJson(res, e.status || 500, { erro: e.message || 'Erro interno.' });
@@ -511,6 +525,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const rows = await db.search({ ...f, limit: limit + 1, offset });
       const hasMore = rows.length > limit;
+      bump('busca_api');
       return sendJson(res, 200, { resultados: rows.slice(0, limit), hasMore, limit, offset });
     } catch (e) {
       return sendJson(res, 500, { erro: 'Erro na busca.' });
@@ -523,6 +538,7 @@ const server = http.createServer(async (req, res) => {
     const cnae = (urlObj.searchParams.get('cnae') || '').trim();
     const key = cnae.toLowerCase();
     const now = Date.now();
+    bump('mapa');
     const hit = mapaCache.get(key);
     if (hit && now - hit.t < MAPA_TTL) return sendJson(res, 200, hit.data);
     if (!rateLimitOk(clientIp(req))) {
@@ -549,6 +565,7 @@ const server = http.createServer(async (req, res) => {
     const cnae = (urlObj.searchParams.get('cnae') || '').trim();
     const key = cnae.toLowerCase();
     const now = Date.now();
+    bump('mapa');
     const hit = heatCache.get(key);
     if (hit && now - hit.t < MAPA_TTL) return sendJson(res, 200, hit.data);
     // cache miss = query pesada: protege contra DoS por CNAE aleatório
@@ -586,6 +603,7 @@ const server = http.createServer(async (req, res) => {
     try {
       const data = await getCnpjData(cnpj);
       counterInc();
+      bump('consulta_web');
       return sendJson(res, 200, data);
     } catch (e) {
       return sendJson(res, e.status || 500, { erro: e.message || 'Erro interno.' });
@@ -674,6 +692,7 @@ const server = http.createServer(async (req, res) => {
     if (m) {
       const cnpj = m[1];
       if (!isValidCnpj(cnpj)) return sendHtml(res, 404, '<h1>CNPJ inválido</h1>', isHead);
+      bump('pagina_cnpj');
       try {
         const data = await getCnpjData(cnpj);
         return sendHtml(res, 200, seo.renderCnpjPage(data, cnpj), isHead);
@@ -721,16 +740,19 @@ const server = http.createServer(async (req, res) => {
 
     // Busca por CNAE/UF/município
     if (pathname === '/busca' || pathname === '/busca/') {
+      bump('pagina_busca');
       return sendHtml(res, 200, seo.renderBusca(), isHead);
     }
 
     // DANFE: gerar PDF da NF-e a partir do XML
     if (pathname === '/nfe' || pathname === '/nfe/' || pathname === '/danfe' || pathname === '/danfe/') {
+      bump('pagina_nfe');
       return sendHtml(res, 200, seo.renderNfe(), isHead);
     }
 
     // Download + tutorial do Agente (certificado digital)
     if (pathname === '/agente' || pathname === '/agente/') {
+      bump('pagina_agente');
       return sendHtml(res, 200, seo.renderAgente(), isHead);
     }
 
@@ -746,7 +768,22 @@ const server = http.createServer(async (req, res) => {
 
     // Widget e incorporação
     if (pathname === '/widget' || pathname === '/widget/') {
+      bump('widget_load');
       return sendHtml(res, 200, seo.renderWidget(), isHead);
+    }
+
+    // Painel de métricas (analytics de primeira mão)
+    if (pathname === '/stats' || pathname === '/stats/') {
+      if (process.env.STATS_KEY && urlObj.searchParams.get('k') !== process.env.STATS_KEY) {
+        return sendHtml(res, 401, '<h1>Acesso restrito</h1><p>Informe ?k=CHAVE.</p>', isHead);
+      }
+      try {
+        await flushMetrics();
+        const [rows, daily] = await Promise.all([db.getMetrics(), db.getMetricsDaily(14)]);
+        return sendHtml(res, 200, seo.renderStats(rows, daily, counterGet()), isHead);
+      } catch (e) {
+        return sendHtml(res, 500, '<h1>Erro ao carregar métricas</h1>', isHead);
+      }
     }
     if (pathname === '/incorporar' || pathname === '/incorporar/') {
       return sendHtml(res, 200, seo.renderEmbed(), isHead);

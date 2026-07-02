@@ -1,6 +1,8 @@
 # SINTEGRA Brasil — robôs bem-vindos, inclusive assistentes de IA
 User-agent: *
 Allow: /
+Disallow: /stats
+Disallow: /health
 
 # Assistentes de IA e buscadores generativos (livres para ler e citar o site)
 User-agent: GPTBot
