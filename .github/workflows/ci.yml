@@ -1,0 +1,21 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Checagem de sintaxe (server, seo, db)
+        run: node --check server.js && node --check seo.js && node --check db.js && node --check importar-nacional.js
+      - name: Checagem de sintaxe (frontend)
+        run: for f in public/*.js; do node --check "$f"; done
+      - name: Checagem do agente
+        run: node --check agente-nfe/agente.js && node --check agente-nfe/sefaz.js
