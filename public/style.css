@@ -931,3 +931,10 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
 summary:focus-visible, [tabindex]:focus-visible {
   outline: 3px solid var(--azul-claro); outline-offset: 2px; border-radius: 4px;
 }
+
+/* ===== Tabelas de resultado (IE / detalhes) — extração limpa por IA ===== */
+.ie-table, .details-table { width: 100%; border-collapse: collapse; margin: 6px 0 8px; }
+.ie-table th, .ie-table td, .details-table th, .details-table td {
+  border: 1px solid var(--borda); padding: 8px 10px; font-size: 14px; text-align: left; vertical-align: top; }
+.ie-table thead th { background: #eef4fb; color: var(--azul); font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
+.details-table th { width: 38%; background: #f7f9fc; color: var(--azul); font-weight: 600; }

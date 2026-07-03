@@ -92,17 +92,21 @@ function renderIe(data) {
     return;
   }
 
+  // Tabela real (facilita extração por IA e leitura)
+  const table = document.createElement('table');
+  table.className = 'ie-table';
+  const body = document.createElement('tbody');
   lista.forEach((ie) => {
-    const div = document.createElement('div');
-    div.className = 'ie-value';
-    const tag = ie.ativo
-      ? '<span class="tag on">Ativa</span>'
-      : '<span class="tag off">Baixada/Inativa</span>';
-    // Quando exibindo todos os estados, mostra a UF de cada inscrição.
-    const ufBadge = !ufSel && ie.uf ? `<span class="ie-uf">${esc(ie.uf)}</span>` : '';
-    div.innerHTML = `${ufBadge}<span>${esc(ie.inscricao_estadual)}</span>${tag}`;
-    box.appendChild(div);
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td>' + esc(ie.inscricao_estadual) + '</td>' +
+      '<td>' + esc(ie.uf || '—') + '</td>' +
+      '<td><span class="tag ' + (ie.ativo ? 'on' : 'off') + '">' + (ie.ativo ? 'Ativa' : 'Baixada/Inativa') + '</span></td>';
+    body.appendChild(tr);
   });
+  table.innerHTML = '<thead><tr><th>Inscrição Estadual</th><th>UF</th><th>Situação</th></tr></thead>';
+  table.appendChild(body);
+  box.appendChild(table);
 }
 
 function renderResult(data) {

@@ -182,6 +182,37 @@ function gaSnippet() {
   return '<script src="/consent.js?v=2" defer></script>';
 }
 
+// --- Helpers de dados estruturados (JSON-LD) para IA/busca ---
+function jsonLd(obj) {
+  return `<script type="application/ld+json">${JSON.stringify(obj)}</script>`;
+}
+/** Marca uma página como ferramenta/utilitário (SoftwareApplication). */
+function softwareAppLd(name, url, description) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name, url, description,
+    applicationCategory: 'BusinessApplication',
+    operatingSystem: 'Web',
+    inLanguage: 'pt-BR',
+    isAccessibleForFree: true,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'BRL' },
+    publisher: { '@id': `${SITE_URL}/#org` },
+  });
+}
+/** Marca uma listagem/base como conjunto de dados (Dataset). */
+function datasetLd(name, url, description) {
+  return jsonLd({
+    '@context': 'https://schema.org',
+    '@type': 'Dataset',
+    name, url, description,
+    inLanguage: 'pt-BR',
+    isAccessibleForFree: true,
+    keywords: 'CNPJ, Inscrição Estadual, CNAE, empresas, Brasil, situação cadastral',
+    creator: { '@type': 'Organization', name: 'SINTEGRA Brasil', url: SITE_URL },
+  });
+}
+
 /** Barra de links por estado (rodape) — linkagem interna p/ rastreamento. */
 function statesNav() {
   const links = UFS.map(
@@ -213,7 +244,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css?v=20" />
+  <link rel="stylesheet" href="/style.css?v=21" />
   ${bc}
   ${gaSnippet()}
 </head>
@@ -301,7 +332,8 @@ function renderStatePage(ufRaw) {
       e selecione ${escapeHtml(nome)}.</p>
 
       <p class="muted">Veja também a consulta em outros estados no rodapé desta página.</p>
-    </article>`;
+    </article>
+    ${datasetLd(`Empresas de ${nome} (${uf}) — Inscrição Estadual por CNPJ`, canonical, `Base de empresas do estado de ${nome} (${uf}) consultáveis por CNPJ, com Inscrição Estadual, situação cadastral, CNAE e endereço.`)}`;
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -328,21 +360,41 @@ function renderCnpjPage(data, cnpj) {
 
   const ies = data.inscricoes_estaduais || [];
   const ieHtml = ies.length
-    ? `<ul class="ie-ssr">${ies
+    ? `<table class="ie-table"><thead><tr><th>Inscrição Estadual</th><th>UF</th><th>Situação</th></tr></thead><tbody>${ies
         .map(
           (ie) =>
-            `<li><span class="ie-num">${escapeHtml(ie.inscricao_estadual)}</span>
-             <span class="ie-uf-badge">${escapeHtml(ie.uf || '—')}</span>
-             <span class="tag ${ie.ativo ? 'on' : 'off'}">${ie.ativo ? 'Ativa' : 'Baixada/Inativa'}</span></li>`
+            `<tr><td>${escapeHtml(ie.inscricao_estadual)}</td><td>${escapeHtml(ie.uf || '—')}</td><td><span class="tag ${ie.ativo ? 'on' : 'off'}">${ie.ativo ? 'Ativa' : 'Baixada/Inativa'}</span></td></tr>`
         )
-        .join('')}</ul>`
+        .join('')}</tbody></table>`
     : '<p class="ie-none">Nenhuma Inscrição Estadual encontrada para este CNPJ.</p>';
 
-  const row = (dt, dd) => (dd ? `<div><dt>${dt}</dt><dd>${escapeHtml(dd)}</dd></div>` : '');
+  const row = (dt, dd) => (dd ? `<tr><th>${dt}</th><td>${escapeHtml(dd)}</td></tr>` : '');
   const end = data.endereco || {};
   const enderecoStr = [end.logradouro, end.bairro, [end.municipio, end.uf].filter(Boolean).join(' / '), end.cep]
     .filter(Boolean)
     .join(', ');
+
+  // Empresa como entidade legível por máquina (Organization) — AIO/Gemini
+  const addr = { addressCountry: 'BR' };
+  if (end.logradouro || end.bairro) addr.streetAddress = [end.logradouro, end.bairro].filter(Boolean).join(', ');
+  if (end.municipio) addr.addressLocality = end.municipio;
+  if (end.uf) addr.addressRegion = end.uf;
+  if (end.cep) addr.postalCode = end.cep;
+  const orgLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: razao,
+    url: canonical,
+    identifier: { '@type': 'PropertyValue', propertyID: 'CNPJ', value: masked },
+    taxID: cnpj,
+    address: { '@type': 'PostalAddress', ...addr },
+  };
+  if (data.nome_fantasia) orgLd.alternateName = data.nome_fantasia;
+  if (ies.length) {
+    orgLd.additionalProperty = ies.map((ie) => ({
+      '@type': 'PropertyValue', name: 'Inscrição Estadual', value: ie.inscricao_estadual, valueReference: ie.uf || undefined,
+    }));
+  }
 
   const bodyHtml = `
     <article class="card">
@@ -353,19 +405,20 @@ function renderCnpjPage(data, cnpj) {
       ${ieHtml}
 
       <h2 class="sec-title">Dados da empresa</h2>
-      <dl class="details">
+      <table class="details-table"><tbody>
         ${row('Situação cadastral', data.situacao_cadastral)}
         ${row('Natureza jurídica', data.natureza_juridica)}
         ${row('Porte', data.porte)}
         ${row('Início de atividade', data.data_inicio_atividade)}
         ${row('Endereço', enderecoStr)}
         ${data.atividade_principal ? row('Atividade principal', data.atividade_principal.codigo + ' - ' + data.atividade_principal.descricao) : ''}
-      </dl>
+      </tbody></table>
 
       <h2 class="sec-title">Consultar outro CNPJ</h2>
       ${searchForm()}
       <p class="source">Dados públicos com caráter informativo. Para fins oficiais, confirme no SINTEGRA da SEFAZ do estado.</p>
-    </article>`;
+    </article>
+    ${jsonLd(orgLd)}`;
 
   const breadcrumb = {
     '@context': 'https://schema.org',
@@ -625,7 +678,7 @@ function renderAtividadesIndex() {
     'Inscrição Estadual por atividade (CNAE) — SINTEGRA Brasil',
     'Consulta de Inscrição Estadual por tipo de atividade econômica (CNAE): comércio, indústria, serviços e mais.',
     'Inscrição Estadual por atividade econômica',
-    `<p>Veja orientações sobre Inscrição Estadual conforme a atividade da empresa:</p><ul class="guides-list">${items}</ul>`
+    `<p>Veja orientações sobre Inscrição Estadual conforme a atividade da empresa:</p><ul class="guides-list">${items}</ul>${datasetLd('Empresas do Brasil por atividade econômica (CNAE)', `${SITE_URL}/atividades`, 'Listagem de empresas brasileiras por atividade econômica (CNAE), consultáveis por CNPJ com Inscrição Estadual, situação cadastral e endereço.')}`
   );
 }
 
@@ -640,7 +693,8 @@ function renderAtividade(slug) {
     <p>Atividades de circulação de mercadorias exigem registro na SEFAZ do estado para emitir nota fiscal
     e recolher o ICMS. Você pode <a href="/">verificar a IE de qualquer empresa pelo CNPJ</a>.</p>
     <p>Veja também a <a href="/atividades">lista de atividades</a> e os
-    <a href="/guias">guias sobre Inscrição Estadual</a>.</p>`;
+    <a href="/guias">guias sobre Inscrição Estadual</a>.</p>
+    ${datasetLd(`Empresas de ${a.nome} (CNAE) no Brasil`, `${SITE_URL}/atividade/${a.slug}`, `Empresas do ramo de ${a.nome.toLowerCase()} consultáveis por CNPJ, com Inscrição Estadual, situação cadastral e CNAE.`)}`;
   return contentPage(
     `/atividade/${a.slug}`,
     `Inscrição Estadual para ${a.nome} (CNAE) — SINTEGRA Brasil`,
@@ -878,7 +932,8 @@ function renderValidador() {
         btn.addEventListener('click',run);
         ie.addEventListener('keydown',function(e){if(e.key==='Enter')run();});
       })();
-    </script>`;
+    </script>
+    ${softwareAppLd('Validador de Inscrição Estadual — SINTEGRA Brasil', `${SITE_URL}/validar-inscricao-estadual`, 'Ferramenta gratuita para validar o dígito verificador da Inscrição Estadual (IE) de qualquer estado do Brasil.')}`;
   return contentPage(
     '/validar-inscricao-estadual',
     'Validar Inscrição Estadual (IE) por estado — SINTEGRA Brasil',
@@ -993,6 +1048,7 @@ function renderBusca() {
 
     <p class="source">Resultados sobre a base já carregada. A Inscrição Estadual aparece ao abrir cada empresa
     (preenchida na consulta). Dados públicos, caráter informativo.</p>
+    ${softwareAppLd('Busca de empresas por CNAE — SINTEGRA Brasil', `${SITE_URL}/busca`, 'Ferramenta gratuita para pesquisar empresas por atividade econômica (CNAE), estado e município, com mapa de calor por região.')}
     <script src="/heatmap.js?v=3"></script>
     <script src="/busca.js?v=1"></script>`;
   return contentPage(
@@ -1064,6 +1120,7 @@ function renderNfe() {
         { '@type': 'HowToStep', name: 'Gerar e baixar', text: 'Clique em Gerar DANFE e depois em Baixar PDF.' },
       ],
     })}</script>
+    ${softwareAppLd('Gerar DANFE e baixar NF-e — SINTEGRA Brasil', `${SITE_URL}/nfe`, 'Ferramenta gratuita para gerar o DANFE da NF-e em PDF a partir do XML, ou baixar a nota pela chave de acesso com certificado digital A1.')}
     <script src="/nfe.js?v=6"></script>`;
   return contentPage(
     '/nfe',
@@ -1163,6 +1220,7 @@ function renderAgente() {
         { '@type': 'HowToStep', name: 'Baixar', text: 'Clique em Baixar da SEFAZ e gere o DANFE em PDF.' },
       ],
     })}</script>
+    ${softwareAppLd('Agente NF-e (certificado digital A1) — SINTEGRA Brasil', `${SITE_URL}/agente`, 'Programa gratuito que baixa a NF-e na SEFAZ pela chave de acesso usando o certificado digital A1 do usuário, sem enviar a chave privada a servidores.')}
 
     <p class="source">Alternativa sem certificado: <a href="/nfe">gerar o DANFE a partir do XML</a> que você já tem.
     Agente em <strong>beta</strong>, ainda não assinado digitalmente. Só baixa notas em que o CNPJ do certificado é
