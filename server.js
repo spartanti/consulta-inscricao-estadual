@@ -257,17 +257,30 @@ function buildResult(data) {
  *  - senao busca na API, monta o payload completo (com IE) e enriquece;
  *  - se a API falhar mas existir base (Receita), devolve a base.
  */
+// Cooldown global da CNPJ.ws: ao bater no limite (429), descansa alguns segundos
+// em vez de martelar a API — assim o orçamento de 3/min se recupera.
+let cnpjwsCooldownUntil = 0;
+
 async function getCnpjData(cnpj) {
   let row = null;
   try { row = await db.getRow(cnpj); } catch (e) { /* banco indisponivel */ }
+  // Já temos IE (enriquecido) → cache, sem tocar a CNPJ.ws.
   if (row && row.enriquecido_em) return row.data;
+
+  // CNPJ.ws em cooldown (limite recente): não insiste — serve a base se tiver.
+  if (Date.now() < cnpjwsCooldownUntil) {
+    if (row && row.data) return row.data; // dados cadastrais da Receita (sem IE fresca)
+    throw { status: 429, message: 'Muitas consultas neste instante. Tente novamente em alguns segundos.' };
+  }
+
   try {
     const raw = await fetchCnpj(cnpj);
     const data = buildResult(raw);
     try { await db.saveEnriched(cnpj, data); } catch (e) { /* best-effort */ }
     return data;
   } catch (e) {
-    if (row && row.data) return row.data; // fallback: base sem IE
+    if (e && e.status === 429) cnpjwsCooldownUntil = Date.now() + 20000; // descansa 20s
+    if (row && row.data) return row.data; // fallback: base cadastral (sem IE)
     throw e;
   }
 }
