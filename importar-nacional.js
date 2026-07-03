@@ -133,11 +133,18 @@ function streamZip(file, onLine) {
 
   // ---- Fase 2: estabelecimentos -> PostgreSQL ----
   let total = 0; let lidos = 0; let batch = [];
+  let perdidos = 0;
   const flush = async () => {
     if (!batch.length) return;
     const b = batch; batch = [];
-    try { await db.upsertBaseBatch(b); total += b.length; } catch (e) { console.error('  lote:', e.message); }
-    if (total % 100000 < BATCH) console.log(`  ... ${total} empresas gravadas no Postgres`);
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try { await db.upsertBaseBatch(b); total += b.length; break; }
+      catch (e) {
+        if (attempt === 4) { perdidos += b.length; console.error(`  lote perdido (${b.length}):`, e.message); }
+        else await new Promise((r) => setTimeout(r, 2000 * attempt)); // backoff p/ ECONNRESET
+      }
+    }
+    if (total % 100000 < BATCH) console.log(`  ... ${total} gravadas${perdidos ? ` | ${perdidos} perdidas` : ''}`);
   };
 
   for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
