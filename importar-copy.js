@@ -1,0 +1,156 @@
+'use strict';
+
+/**
+ * Importador NACIONAL via COPY (carga em massa eficiente, resiliente ao proxy).
+ *
+ * Em vez de milhares de INSERTs (uma ida ao proxy por lote), usa:
+ *   COPY  -> tabela de staging UNLOGGED (stream, pouquíssimo overhead)
+ *   INSERT ... SELECT ... ON CONFLICT  -> upsert em bloco (server-side)
+ *
+ * Reaproveita o índice SQLite (_emp_lookup.db) já construído: razão social (emp)
+ * e sócios (soc). Requer os Estabelecimentos*.zip + os aux (Municipios/Cnaes/Qualificacoes).
+ *
+ *   SKIP_INDEXES=1 DATABASE_URL=<público> LOCAL_DIR=~/receita-dados/2026-06 node importar-copy.js
+ *   ... CHUNK=20000 LIMIT=0 SOMENTE_ATIVAS=0 node importar-copy.js
+ */
+const { spawn } = require('child_process');
+const readline = require('readline');
+const path = require('path');
+const fs = require('fs');
+const { Pool } = require('pg');
+const copyFrom = require('pg-copy-streams').from;
+const { DatabaseSync } = require('node:sqlite');
+const { parseCsvLine, buildEstabData } = require('./importar-receita');
+
+const LOCAL_DIR = process.env.LOCAL_DIR;
+const CHUNK = parseInt(process.env.CHUNK || '20000', 10) || 20000;
+const LIMIT = parseInt(process.env.LIMIT || '0', 10) || 0;
+const SOMENTE_ATIVAS = process.env.SOMENTE_ATIVAS === '1';
+
+const COLS = 'cnpj,razao_social,nome_fantasia,uf,municipio,cnae_codigo,cnae_descricao,situacao_cadastral,data';
+const STG = 'empresas_stg';
+const UPSERT = `INSERT INTO empresas (${COLS},updated_at)
+  SELECT DISTINCT ON (cnpj) ${COLS}, now() FROM ${STG}
+  ON CONFLICT (cnpj) DO UPDATE SET
+    razao_social=EXCLUDED.razao_social, nome_fantasia=EXCLUDED.nome_fantasia,
+    uf=EXCLUDED.uf, municipio=EXCLUDED.municipio,
+    cnae_codigo=EXCLUDED.cnae_codigo, cnae_descricao=EXCLUDED.cnae_descricao,
+    situacao_cadastral=EXCLUDED.situacao_cadastral,
+    data=CASE WHEN empresas.enriquecido_em IS NULL THEN EXCLUDED.data ELSE empresas.data END,
+    updated_at=now()`;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+function exists(f) { try { fs.accessSync(path.join(LOCAL_DIR, f)); return true; } catch (e) { return false; } }
+function csv(v) { return v == null ? '' : '"' + String(v).replace(/"/g, '""') + '"'; }
+function rowCsv(d) {
+  const cnae = d.atividade_principal || {};
+  return [d.cnpj, d.razao_social, d.nome_fantasia, d.uf, d.municipio,
+    cnae.codigo || null, cnae.descricao || null, d.situacao_cadastral, JSON.stringify(d)]
+    .map(csv).join(',');
+}
+
+function streamZip(file, onLine) {
+  return new Promise((resolve) => {
+    const sh = spawn('bash', ['-c', `funzip "${LOCAL_DIR}/${file}"`], { stdio: ['ignore', 'pipe', 'ignore'] });
+    sh.stdout.setEncoding('latin1');
+    const rl = readline.createInterface({ input: sh.stdout, crlfDelay: Infinity });
+    let done = false; const fin = () => { if (!done) { done = true; resolve(); } };
+    let stop = false;
+    const halt = () => { stop = true; rl.close(); try { sh.kill('SIGKILL'); } catch (e) {} };
+    rl.on('line', (line) => {
+      if (stop || !line) return;
+      const r = onLine(parseCsvLine(line));
+      if (r === false) { halt(); return; }
+      if (r && typeof r.then === 'function') {
+        rl.pause();
+        r.then((v) => { if (v === false) halt(); else if (!stop) rl.resume(); }).catch(() => { if (!stop) rl.resume(); });
+      }
+    });
+    rl.on('close', fin); sh.on('error', fin); sh.on('close', fin);
+  });
+}
+
+(async () => {
+  if (!process.env.DATABASE_URL || !LOCAL_DIR) throw new Error('Defina DATABASE_URL e LOCAL_DIR.');
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 });
+
+  // staging UNLOGGED (rápida, sem índice)
+  await pool.query(`CREATE UNLOGGED TABLE IF NOT EXISTS ${STG} (cnpj text, razao_social text, nome_fantasia text, uf text, municipio text, cnae_codigo text, cnae_descricao text, situacao_cadastral text, data jsonb)`);
+
+  // mapas de apoio
+  const muniMap = {}; const cnaeMap = {}; const qualMap = {};
+  await streamZip('Municipios.zip', (f) => { muniMap[f[0]] = f[1]; });
+  await streamZip('Cnaes.zip', (f) => { cnaeMap[String(f[0]).replace(/\D/g, '')] = f[1]; });
+  if (exists('Qualificacoes.zip')) await streamZip('Qualificacoes.zip', (f) => { qualMap[f[0]] = f[1]; });
+  console.log(`Municípios: ${Object.keys(muniMap).length} | CNAEs: ${Object.keys(cnaeMap).length} | Qualif: ${Object.keys(qualMap).length}`);
+  const FAIXA = { '0': null, '1': '0 a 12 anos', '2': '13 a 20 anos', '3': '21 a 30 anos', '4': '31 a 40 anos', '5': '41 a 50 anos', '6': '51 a 60 anos', '7': '61 a 70 anos', '8': '71 a 80 anos', '9': 'Mais de 80 anos' };
+
+  // índice SQLite já construído (razão + sócios)
+  const empdb = new DatabaseSync(path.join(LOCAL_DIR, '_emp_lookup.db'));
+  const getEmp = empdb.prepare('SELECT razao,natureza,porte,capital FROM emp WHERE b=?');
+  const getSoc = empdb.prepare('SELECT nome,qual,faixa,dt FROM soc WHERE b=?');
+  console.log(`emp: ${empdb.prepare('SELECT COUNT(*) c FROM emp').get().c} | soc: ${empdb.prepare('SELECT COUNT(*) c FROM soc').get().c}`);
+
+  // client persistente + reconexão (proxy instável)
+  let client = null;
+  const getClient = async () => { if (!client) client = await pool.connect(); return client; };
+  const resetClient = async () => { try { if (client) client.release(true); } catch (e) {} client = null; };
+
+  let total = 0; let perdidos = 0; let buf = [];
+  const flush = async () => {
+    if (!buf.length) return;
+    const rows = buf; buf = [];
+    const data = rows.join('\n') + '\n';
+    for (let attempt = 1; attempt <= 6; attempt++) {
+      try {
+        const c = await getClient();
+        await c.query(`TRUNCATE ${STG}`);
+        await new Promise((resolve, reject) => {
+          const s = c.query(copyFrom(`COPY ${STG} (${COLS}) FROM STDIN WITH (FORMAT csv)`));
+          s.on('error', reject); s.on('finish', resolve);
+          s.write(data); s.end();
+        });
+        await c.query(UPSERT);
+        total += rows.length;
+        break;
+      } catch (e) {
+        await resetClient();
+        if (attempt === 6) { perdidos += rows.length; console.error(`  chunk perdido (${rows.length}):`, e.message); break; }
+        await sleep(1500 * attempt);
+      }
+    }
+    if (total % 500000 < CHUNK) console.log(`  ... ${total} gravadas${perdidos ? ` | ${perdidos} perdidas` : ''}`);
+  };
+
+  let lidos = 0;
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    const f = `Estabelecimentos${k}.zip`;
+    if (!exists(f)) continue;
+    console.log(`[Estab] ${f}...`);
+    await streamZip(f, (c) => {
+      lidos++;
+      if (SOMENTE_ATIVAS && c[5] !== '02') return;
+      const e = getEmp.get(c[0]) || null;
+      const emp = e ? { razao: e.razao, natureza: e.natureza, porte: e.porte, capital: e.capital } : null;
+      const d = buildEstabData(c, emp, muniMap, cnaeMap);
+      if (!/^\d{14}$/.test(d.cnpj)) return;
+      const socios = getSoc.all(c[0]);
+      if (socios.length) d.socios = socios.map((s) => ({ nome: s.nome, qualificacao: s.qual, faixa_etaria: s.faixa, data_entrada: s.dt }));
+      buf.push(rowCsv(d));
+      if (buf.length >= CHUNK) {
+        if (LIMIT && total + buf.length >= LIMIT) return flush().then(() => false);
+        return flush();
+      }
+    });
+    await flush();
+    console.log(`[Estab] ${f} ok. Lidos ${lidos} | gravados ${total}`);
+    if (LIMIT && total >= LIMIT) break;
+  }
+
+  await resetClient();
+  empdb.close();
+  await pool.query(`DROP TABLE IF EXISTS ${STG}`);
+  const cnt = await pool.query('SELECT COUNT(*)::int c FROM empresas');
+  console.log(`CONCLUÍDO. Total no banco: ${cnt.rows[0].c}${perdidos ? ` | ${perdidos} perdidas` : ''}`);
+  await pool.end();
+})().catch((e) => { console.error('ERRO:', e.message); process.exit(1); });
