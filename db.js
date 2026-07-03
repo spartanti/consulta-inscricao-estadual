@@ -40,10 +40,14 @@ async function init(connStr) {
       updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
-  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_uf ON empresas(uf);');
-  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_municipio ON empresas(municipio);');
-  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_cnae ON empresas(cnae_codigo);');
-  await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_updated ON empresas(updated_at DESC);');
+  // SKIP_INDEXES=1 (usado na carga em massa) pula a criação dos índices secundários,
+  // que são derrubados durante o import e recriados no fim para acelerar a gravação.
+  if (!process.env.SKIP_INDEXES) {
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_uf ON empresas(uf);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_municipio ON empresas(municipio);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_cnae ON empresas(cnae_codigo);');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_empresas_updated ON empresas(updated_at DESC);');
+  }
   // Métricas de uso (analytics de primeira mão, por origem)
   await pool.query(`
     CREATE TABLE IF NOT EXISTS metrics (

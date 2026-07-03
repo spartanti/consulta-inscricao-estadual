@@ -247,6 +247,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <link rel="stylesheet" href="/style.css?v=21" />
   ${bc}
   ${gaSnippet()}
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1697859368408278" crossorigin="anonymous"></script>
 </head>
 <body>
   <header class="topbar">

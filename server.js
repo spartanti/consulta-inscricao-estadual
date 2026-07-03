@@ -355,10 +355,11 @@ function setSecurityHeaders(res, pathname) {
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com",
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://unpkg.com https://pagead2.googlesyndication.com https://*.googlesyndication.com https://adservice.google.com https://*.googleadservices.com https://*.adtrafficquality.google",
       "style-src 'self' 'unsafe-inline' https://unpkg.com",
       "img-src 'self' data: https:",
-      "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com http://127.0.0.1:54345 http://localhost:54345",
+      "connect-src 'self' https://www.google-analytics.com https://region1.google-analytics.com http://127.0.0.1:54345 http://localhost:54345 https://pagead2.googlesyndication.com https://*.googlesyndication.com https://*.doubleclick.net https://*.google.com https://*.adtrafficquality.google",
+      "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com https://www.google.com https://*.googlesyndication.com https://*.doubleclick.net",
       "font-src 'self' data:",
       'frame-ancestors ' + frameAncestors,
     ].join('; ')
