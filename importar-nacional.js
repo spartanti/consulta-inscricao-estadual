@@ -23,6 +23,9 @@ const { parseCsvLine, buildEstabData, dateBR } = require('./importar-receita');
 const LOCAL_DIR = process.env.LOCAL_DIR;
 const BATCH = parseInt(process.env.BATCH || '2000', 10) || 2000;
 const LIMIT = parseInt(process.env.LIMIT || '0', 10) || 0;
+// SOMENTE_ATIVAS=1 → importa só estabelecimentos com situação cadastral ATIVA (código 02).
+// Corta muito o volume/armazenamento e melhora a qualidade (sem empresas baixadas/inaptas).
+const SOMENTE_ATIVAS = process.env.SOMENTE_ATIVAS === '1';
 
 function exists(file) {
   try { require('fs').accessSync(path.join(LOCAL_DIR, file)); return true; } catch (e) { return false; }
@@ -143,6 +146,7 @@ function streamZip(file, onLine) {
     console.log(`[Estabelecimentos] processando ${f}...`);
     await streamZip(f, (c) => {
       lidos++;
+      if (SOMENTE_ATIVAS && c[5] !== '02') return; // pula não-ativas
       const e = getEmp.get(c[0]) || null;
       const emp = e ? { razao: e.razao, natureza: e.natureza, porte: e.porte, capital: e.capital } : null;
       const d = buildEstabData(c, emp, muniMap, cnaeMap);
