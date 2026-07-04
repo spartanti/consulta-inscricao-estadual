@@ -135,7 +135,8 @@ function streamZip(file, onLine) {
   };
 
   let lidos = 0;
-  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+  const START_FILE = parseInt(process.env.START_FILE || '0', 10) || 0; // retomar de Estabelecimentos<N>
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter((n) => n >= START_FILE)) {
     const f = `Estabelecimentos${k}.zip`;
     if (!exists(f)) continue;
     console.log(`[Estab] ${f}...`);
