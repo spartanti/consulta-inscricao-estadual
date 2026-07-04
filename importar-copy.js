@@ -29,17 +29,20 @@ const SOMENTE_ATIVAS = process.env.SOMENTE_ATIVAS === '1';
 
 const COLS = 'cnpj,razao_social,nome_fantasia,uf,municipio,cnae_codigo,cnae_descricao,situacao_cadastral,data';
 const STG = 'empresas_stg';
+// DO NOTHING: os ~20M já importados vêm da MESMA fonte (2026-06), então re-gravá-los
+// seria só bloat/lentidão. Pulamos existentes (preserva também o cache de IE enriquecido)
+// e inserimos apenas os novos. Muito mais rápido e sem write-amplification.
 const UPSERT = `INSERT INTO empresas (${COLS},updated_at)
   SELECT DISTINCT ON (cnpj) ${COLS}, now() FROM ${STG}
-  ON CONFLICT (cnpj) DO UPDATE SET
-    razao_social=EXCLUDED.razao_social, nome_fantasia=EXCLUDED.nome_fantasia,
-    uf=EXCLUDED.uf, municipio=EXCLUDED.municipio,
-    cnae_codigo=EXCLUDED.cnae_codigo, cnae_descricao=EXCLUDED.cnae_descricao,
-    situacao_cadastral=EXCLUDED.situacao_cadastral,
-    data=CASE WHEN empresas.enriquecido_em IS NULL THEN EXCLUDED.data ELSE empresas.data END,
-    updated_at=now()`;
+  ON CONFLICT (cnpj) DO NOTHING`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// nenhuma etapa pode pendurar pra sempre num socket morto do proxy
+function withTimeout(p, ms, label) {
+  let t;
+  const to = new Promise((_, reject) => { t = setTimeout(() => reject(new Error(`timeout ${label} ${ms}ms`)), ms); });
+  return Promise.race([Promise.resolve(p), to]).finally(() => clearTimeout(t));
+}
 function exists(f) { try { fs.accessSync(path.join(LOCAL_DIR, f)); return true; } catch (e) { return false; } }
 function csv(v) { return v == null ? '' : '"' + String(v).replace(/"/g, '""') + '"'; }
 function rowCsv(d) {
@@ -72,7 +75,13 @@ function streamZip(file, onLine) {
 
 (async () => {
   if (!process.env.DATABASE_URL || !LOCAL_DIR) throw new Error('Defina DATABASE_URL e LOCAL_DIR.');
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 });
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3,
+    keepAlive: true, keepAliveInitialDelayMillis: 10000,
+    connectionTimeoutMillis: 20000, idleTimeoutMillis: 30000,
+    statement_timeout: 120000, query_timeout: 120000,
+  });
+  pool.on('error', () => {}); // ignora erros de conexões ociosas derrubadas pelo proxy
 
   // staging UNLOGGED (rápida, sem índice)
   await pool.query(`CREATE UNLOGGED TABLE IF NOT EXISTS ${STG} (cnpj text, razao_social text, nome_fantasia text, uf text, municipio text, cnae_codigo text, cnae_descricao text, situacao_cadastral text, data jsonb)`);
@@ -93,7 +102,10 @@ function streamZip(file, onLine) {
 
   // client persistente + reconexão (proxy instável)
   let client = null;
-  const getClient = async () => { if (!client) client = await pool.connect(); return client; };
+  const getClient = async () => {
+    if (!client) { client = await pool.connect(); client.on('error', () => {}); }
+    return client;
+  };
   const resetClient = async () => { try { if (client) client.release(true); } catch (e) {} client = null; };
 
   let total = 0; let perdidos = 0; let buf = [];
@@ -103,14 +115,14 @@ function streamZip(file, onLine) {
     const data = rows.join('\n') + '\n';
     for (let attempt = 1; attempt <= 6; attempt++) {
       try {
-        const c = await getClient();
-        await c.query(`TRUNCATE ${STG}`);
-        await new Promise((resolve, reject) => {
+        const c = await withTimeout(getClient(), 25000, 'connect');
+        await withTimeout(c.query(`TRUNCATE ${STG}`), 30000, 'truncate');
+        await withTimeout(new Promise((resolve, reject) => {
           const s = c.query(copyFrom(`COPY ${STG} (${COLS}) FROM STDIN WITH (FORMAT csv)`));
           s.on('error', reject); s.on('finish', resolve);
           s.write(data); s.end();
-        });
-        await c.query(UPSERT);
+        }), 90000, 'copy');
+        await withTimeout(c.query(UPSERT), 90000, 'upsert');
         total += rows.length;
         break;
       } catch (e) {
@@ -149,8 +161,9 @@ function streamZip(file, onLine) {
 
   await resetClient();
   empdb.close();
-  await pool.query(`DROP TABLE IF EXISTS ${STG}`);
-  const cnt = await pool.query('SELECT COUNT(*)::int c FROM empresas');
-  console.log(`CONCLUÍDO. Total no banco: ${cnt.rows[0].c}${perdidos ? ` | ${perdidos} perdidas` : ''}`);
+  try { await withTimeout(pool.query(`DROP TABLE IF EXISTS ${STG}`), 20000, 'drop'); } catch (e) {}
+  let cntTxt = '(contagem pulada)';
+  try { const cnt = await withTimeout(pool.query('SELECT reltuples::bigint c FROM pg_class WHERE relname=$1', ['empresas']), 15000, 'count'); cntTxt = `~${cnt.rows[0].c} (estimado)`; } catch (e) {}
+  console.log(`CONCLUÍDO. Processadas ${total} | Total no banco: ${cntTxt}${perdidos ? ` | ${perdidos} perdidas` : ''}`);
   await pool.end();
 })().catch((e) => { console.error('ERRO:', e.message); process.exit(1); });

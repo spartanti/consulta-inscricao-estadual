@@ -1,6 +1,7 @@
 # SINTEGRA Brasil — robôs bem-vindos, inclusive assistentes de IA
 User-agent: *
 Allow: /
+Allow: /cnpj/
 Disallow: /stats
 Disallow: /health
 
