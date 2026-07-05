@@ -208,6 +208,9 @@ function datasetLd(name, url, description) {
     name, url, description,
     inLanguage: 'pt-BR',
     isAccessibleForFree: true,
+    // Licença canônica dos dados-fonte (Dados Abertos da Receita Federal / dados.gov.br)
+    license: 'https://opendatacommons.org/licenses/odbl/1-0/',
+    creditText: 'Receita Federal do Brasil — Dados Abertos do CNPJ',
     keywords: 'CNPJ, Inscrição Estadual, CNAE, empresas, Brasil, situação cadastral',
     creator: { '@type': 'Organization', name: 'SINTEGRA Brasil', url: SITE_URL },
   });
@@ -271,7 +274,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
       <a href="/guias">Guias</a> · <a href="/atividades">Atividades</a> ·
       <a href="/incorporar">Incorporar</a> · <a href="/api">API</a><br />
       <a href="/sobre">Sobre</a> · <a href="/sobre-os-dados">Fonte dos dados</a> · <a href="/contato">Contato</a> ·
-      <a href="/privacidade">Privacidade</a> · <a href="/cookies">Cookies</a> · <a href="/termos">Termos</a>
+      <a href="/privacidade">Privacidade</a> · <a href="/cookies">Cookies</a> · <a href="/termos">Termos</a> · <a href="/lgpd">Exclusão de dados</a>
     </p>
     ${statesNav()}
     <p class="disclaimer">
@@ -796,12 +799,17 @@ function renderPrivacidade() {
 
     <h2>9. Seus direitos (art. 18 da LGPD)</h2>
     <p>Você pode solicitar: confirmação e acesso aos dados; correção; anonimização, bloqueio ou eliminação;
-    portabilidade; informação sobre compartilhamentos; e revogação do consentimento. Para exercer, escreva para
-    <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a> ou use a <a href="/contato">página de Contato</a>.</p>
+    portabilidade; informação sobre compartilhamentos; e revogação do consentimento. Para exercer, use o
+    <a href="/lgpd"><strong>formulário de Exclusão de Dados (LGPD)</strong></a> — que emite número de
+    protocolo e permite acompanhar o andamento — ou escreva para
+    <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a>.</p>
 
     <h2>10. Remoção de dados de empresa/sócio</h2>
-    <p>Pedidos de remoção ou correção de informações exibidas podem ser feitos pela
-    <a href="/contato">página de Contato</a> e serão avaliados conforme a legislação.</p>
+    <p>Pedidos de eliminação, confirmação de exclusão ou correção de informações exibidas devem ser feitos pelo
+    <a href="/lgpd">formulário de Exclusão de Dados (LGPD)</a>. Cada pedido gera um <strong>protocolo</strong> e é
+    respondido em até <strong>15 dias</strong> (art. 19, II, da LGPD), conforme a lei e as orientações da ANPD.
+    Dados excluídos deixam de ser exibidos e as páginas passam a indicar
+    <em>“Dados excluídos em conformidade com a LGPD”</em>.</p>
 
     <h2>11. Segurança</h2>
     <p>Adotamos medidas técnicas e organizacionais razoáveis para proteger as informações tratadas.</p>
@@ -811,6 +819,130 @@ function renderPrivacidade() {
 
     <p class="muted">Este serviço é independente e não possui vínculo com a Receita Federal, SEFAZ ou órgãos públicos.</p>`;
   return contentPage('/privacidade', 'Política de Privacidade (LGPD) — SINTEGRA Brasil', 'Política de Privacidade do SINTEGRA Brasil em conformidade com a LGPD: dados tratados, bases legais, cookies, compartilhamento e direitos do titular.', 'Política de Privacidade', inner, 'Privacidade');
+}
+
+// --- Exclusão de dados (LGPD): formulário com protocolo + consulta de andamento ---
+function renderLgpd() {
+  const inner = `
+    <p class="muted">Conforme a <strong>Lei nº 13.709/2018 (LGPD)</strong> e as orientações da
+    <strong>ANPD</strong> (Autoridade Nacional de Proteção de Dados).</p>
+
+    <p>Esta página é o canal oficial do <strong>SINTEGRA Brasil</strong> para o titular de dados exercer os
+    direitos previstos no <strong>art. 18 da LGPD</strong>: solicitar a <strong>eliminação</strong> de dados
+    pessoais exibidos no site (ex.: nome de sócio no QSA), obter a <strong>confirmação</strong> de uma
+    exclusão já realizada ou pedir a <strong>correção</strong> de dados incompletos ou desatualizados.</p>
+
+    <h2>Como funciona</h2>
+    <ol>
+      <li>Preencha o formulário abaixo. Você recebe na hora um <strong>número de protocolo</strong>.</li>
+      <li>Analisamos o pedido conforme a LGPD e respondemos pelo e-mail informado em até
+      <strong>15 dias</strong> (art. 19, II, da LGPD).</li>
+      <li>Confirmada a exclusão, as páginas do CNPJ passam a exibir
+      <em>“❗ Dados excluídos em conformidade com a LGPD”</em> e os dados deixam de ser servidos
+      pelo site e pela API.</li>
+      <li>Acompanhe o andamento a qualquer momento pelo protocolo, no campo ao final desta página.</li>
+    </ol>
+    <p class="muted">Importante: dados cadastrais de empresas (CNPJ, razão social, endereço, CNAE) são
+    <strong>dados públicos</strong> divulgados pela Receita Federal. A LGPD protege <strong>pessoas
+    naturais</strong>; por isso os pedidos são avaliados individualmente, conforme a lei e as orientações da
+    ANPD (<a href="https://www.gov.br/anpd" target="_blank" rel="noopener">gov.br/anpd</a>).</p>
+
+    <h2>Formulário de solicitação</h2>
+    <form id="lgpd-form" class="card" style="padding:20px;display:grid;gap:12px;max-width:640px">
+      <label>Tipo de solicitação*<br>
+        <select name="tipo" required style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc">
+          <option value="">Selecione…</option>
+          <option value="exclusao">Exclusão de dados pessoais</option>
+          <option value="confirmacao">Confirmação de exclusão já solicitada</option>
+          <option value="correcao">Correção de dados</option>
+        </select></label>
+      <label>CNPJ relacionado (se houver)<br>
+        <input name="cnpj" type="text" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <label>Seu nome completo*<br>
+        <input name="nome" type="text" required maxlength="120"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <label>E-mail para retorno*<br>
+        <input name="email" type="email" required maxlength="160"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <label>Sua relação com os dados*<br>
+        <select name="relacao" required style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc">
+          <option value="">Selecione…</option>
+          <option value="titular">Titular dos dados (pessoa física citada)</option>
+          <option value="representante">Representante legal da empresa</option>
+          <option value="procurador">Procurador do titular</option>
+        </select></label>
+      <label>Descreva a solicitação*<br>
+        <textarea name="mensagem" required maxlength="2000" rows="4"
+          placeholder="Ex.: solicito a exclusão do meu nome do quadro societário exibido na página do CNPJ acima."
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></textarea></label>
+      <input name="site" type="text" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+      <button type="submit" style="padding:12px 18px;border:none;border-radius:8px;background:var(--azul,#0b4f9e);color:#fff;font-weight:600;cursor:pointer">Enviar solicitação</button>
+      <p id="lgpd-msg" class="muted" role="status"></p>
+    </form>
+
+    <h2>Consultar andamento</h2>
+    <form id="lgpd-check" class="card" style="padding:20px;display:grid;gap:12px;max-width:640px">
+      <label>Número do protocolo<br>
+        <input name="protocolo" type="text" required placeholder="LGPD-AAAAMMDD-XXXXXXXX"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;text-transform:uppercase"></label>
+      <button type="submit" style="padding:12px 18px;border:none;border-radius:8px;background:var(--azul,#0b4f9e);color:#fff;font-weight:600;cursor:pointer">Consultar protocolo</button>
+      <p id="lgpd-check-msg" class="muted" role="status"></p>
+    </form>
+
+    <h2>Base legal e referências oficiais</h2>
+    <ul>
+      <li><a href="https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm" target="_blank" rel="noopener">Lei nº 13.709/2018 — LGPD</a> (arts. 5º, 18 e 19).</li>
+      <li><a href="https://www.gov.br/anpd" target="_blank" rel="noopener">ANPD — Autoridade Nacional de Proteção de Dados</a> (orientações e guias).</li>
+      <li>Encarregado (DPO): <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a> — canal alternativo para qualquer pedido desta página.</li>
+    </ul>
+
+    <script>
+    (function () {
+      var f = document.getElementById('lgpd-form');
+      var msg = document.getElementById('lgpd-msg');
+      f.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var d = Object.fromEntries(new FormData(f).entries());
+        msg.textContent = 'Enviando…';
+        fetch('/api/lgpd', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(d) })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            if (!x.ok) { msg.textContent = '❗ ' + (x.j.erro || 'Não foi possível enviar.'); return; }
+            f.reset();
+            msg.innerHTML = '✅ Solicitação registrada. Guarde o seu protocolo: <strong>' + x.j.protocolo +
+              '</strong><br>' + (x.j.prazo || '');
+          })
+          .catch(function () { msg.textContent = '❗ Erro de conexão. Tente novamente.'; });
+      });
+      var c = document.getElementById('lgpd-check');
+      var cm = document.getElementById('lgpd-check-msg');
+      var ST = { recebida: 'Recebida — em análise', em_analise: 'Em análise', concluida: 'Concluída', negada: 'Não atendida (veja a resposta)' };
+      c.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var p = new FormData(c).get('protocolo').trim().toUpperCase();
+        cm.textContent = 'Consultando…';
+        fetch('/api/lgpd?protocolo=' + encodeURIComponent(p))
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            if (!x.ok) { cm.textContent = '❗ ' + (x.j.erro || 'Protocolo não encontrado.'); return; }
+            var dt = new Date(x.j.criada_em).toLocaleDateString('pt-BR');
+            cm.innerHTML = '<strong>' + x.j.protocolo + '</strong> — aberta em ' + dt +
+              '<br>Situação: <strong>' + (ST[x.j.status] || x.j.status) + '</strong>' +
+              (x.j.resposta ? '<br>Resposta: ' + x.j.resposta : '');
+          })
+          .catch(function () { cm.textContent = '❗ Erro de conexão. Tente novamente.'; });
+      });
+    })();
+    </script>`;
+  return contentPage(
+    '/lgpd',
+    'Exclusão de Dados (LGPD) — SINTEGRA Brasil',
+    'Formulário oficial do SINTEGRA Brasil para titulares de dados solicitarem exclusão, confirmação de exclusão ou correção de dados pessoais, conforme a LGPD e as orientações da ANPD. Emissão de protocolo e acompanhamento.',
+    'Exclusão de Dados (LGPD)',
+    inner,
+    'Exclusão de Dados'
+  );
 }
 
 function renderTermos() {
@@ -849,9 +981,13 @@ function renderTermos() {
     <p>A marca, o layout e o software do SINTEGRA Brasil pertencem à Spartan TI. Os dados públicos pertencem às
     respectivas fontes oficiais.</p>
 
-    <h2>8. Privacidade</h2>
+    <h2>8. Privacidade e direitos do titular (LGPD)</h2>
     <p>O tratamento de dados segue a nossa <a href="/privacidade">Política de Privacidade</a>, em conformidade
-    com a LGPD.</p>
+    com a Lei nº 13.709/2018 (LGPD). Titulares de dados podem solicitar <strong>exclusão, confirmação de
+    exclusão ou correção</strong> de dados pessoais pelo <a href="/lgpd">formulário de Exclusão de Dados
+    (LGPD)</a>, com emissão de protocolo e resposta em até 15 dias. Dados excluídos deixam de ser exibidos no
+    site e na API, e as páginas correspondentes passam a indicar
+    <em>“Dados excluídos em conformidade com a LGPD”</em>.</p>
 
     <h2>9. Independência</h2>
     <p>O SINTEGRA Brasil é um serviço <strong>independente e privado</strong>, sem vínculo com a Receita Federal,
@@ -1431,6 +1567,7 @@ module.exports = {
   renderContato,
   renderPrivacidade,
   renderTermos,
+  renderLgpd,
   renderValidador,
   renderWidget,
   renderEmbed,

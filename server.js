@@ -268,7 +268,7 @@ const CNPJ_REMOVIDOS = new Set([
 
 async function getCnpjData(cnpj) {
   if (CNPJ_REMOVIDOS.has(cnpj)) {
-    throw { status: 410, message: 'Dados excluídos por solicitação' };
+    throw { status: 410, message: 'Dados excluídos em conformidade com a LGPD' };
   }
   let row = null;
   try { row = await db.getRow(cnpj); } catch (e) { /* banco indisponivel */ }
@@ -670,6 +670,61 @@ const server = http.createServer(async (req, res) => {
     return sendJson(res, 200, { count: counterGet() });
   }
 
+  // LGPD: abrir solicitação (exclusão / confirmação / correção) -> protocolo
+  if (req.method === 'POST' && pathname === '/api/lgpd') {
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Muitas solicitações. Tente novamente em instantes.' });
+    }
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 10240) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const b = JSON.parse(body || '{}');
+        if (b.site) return sendJson(res, 400, { erro: 'Solicitação inválida.' }); // honeypot anti-spam
+        const TIPOS = ['exclusao', 'confirmacao', 'correcao'];
+        const tipo = String(b.tipo || '').trim();
+        const nome = String(b.nome || '').trim().slice(0, 120);
+        const email = String(b.email || '').trim().slice(0, 160);
+        const relacao = String(b.relacao || '').trim().slice(0, 60);
+        const mensagem = String(b.mensagem || '').trim().slice(0, 2000);
+        const cnpjSol = onlyDigits(String(b.cnpj || ''));
+        if (!TIPOS.includes(tipo)) return sendJson(res, 400, { erro: 'Informe o tipo da solicitação.' });
+        if (nome.length < 3) return sendJson(res, 400, { erro: 'Informe seu nome completo.' });
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { erro: 'Informe um e-mail válido para retorno.' });
+        if (cnpjSol && cnpjSol.length !== 14) return sendJson(res, 400, { erro: 'CNPJ informado é inválido (14 dígitos).' });
+        const dt = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        const protocolo = `LGPD-${dt}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
+        await db.lgpdCreate({ protocolo, tipo, cnpj: cnpjSol || null, nome, email, relacao, mensagem });
+        bump('lgpd_solicitacao');
+        return sendJson(res, 201, { protocolo, prazo: 'Retornaremos pelo e-mail informado em até 15 dias (art. 19 da LGPD).' });
+      } catch (e) {
+        return sendJson(res, 500, { erro: 'Não foi possível registrar a solicitação. Tente novamente ou escreva para admin@spartanti.com.br.' });
+      }
+    });
+    return;
+  }
+
+  // LGPD: consultar andamento por protocolo (não expõe dados pessoais)
+  if (req.method === 'GET' && pathname === '/api/lgpd') {
+    const key = urlObj.searchParams.get('key');
+    if (key && process.env.STATS_KEY && key === process.env.STATS_KEY) {
+      try { return sendJson(res, 200, { solicitacoes: await db.lgpdList(200) }); }
+      catch (e) { return sendJson(res, 500, { erro: 'Erro ao listar.' }); }
+    }
+    const protocolo = String(urlObj.searchParams.get('protocolo') || '').trim().toUpperCase();
+    if (!/^LGPD-\d{8}-[0-9A-F]{8}$/.test(protocolo)) {
+      return sendJson(res, 400, { erro: 'Protocolo inválido. Formato: LGPD-AAAAMMDD-XXXXXXXX.' });
+    }
+    try {
+      const s = await db.lgpdGet(protocolo);
+      if (!s) return sendJson(res, 404, { erro: 'Protocolo não encontrado.' });
+      return sendJson(res, 200, s);
+    } catch (e) {
+      return sendJson(res, 500, { erro: 'Erro ao consultar o protocolo.' });
+    }
+  }
+
   if (isGet) {
     // Sitemap: ÍNDICE apontando p/ páginas SEO + blocos de CNPJ (toda a base)
     if (pathname === '/sitemap.xml') {
@@ -713,6 +768,7 @@ const server = http.createServer(async (req, res) => {
         { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/privacidade`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/termos`, priority: '0.3' },
+        { loc: `${seo.SITE_URL}/lgpd`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/cookies`, priority: '0.3' },
         ...seo.UFS.map((uf) => ({ loc: `${seo.SITE_URL}/sintegra/${uf.toLowerCase()}`, priority: '0.8' })),
         ...seo.CAPITAIS.map((c) => ({ loc: `${seo.SITE_URL}/cidade/${c.slug}`, priority: '0.6' })),
@@ -753,6 +809,11 @@ const server = http.createServer(async (req, res) => {
         return sendHtml(res, 200, seo.renderCnpjPage(data, cnpj), isHead);
       } catch (e) {
         const st = e.status === 404 || e.status === 410 || e.status === 429 ? e.status : 502;
+        if (st === 410) {
+          return sendHtml(res, 410, `<h1>❗ ${e.message}</h1>
+            <p>Estes dados foram removidos a pedido do titular, conforme a Lei nº 13.709/2018 (LGPD).</p>
+            <p><a href="/lgpd">Solicitar exclusão ou confirmação de exclusão de dados</a></p>`, isHead);
+        }
         return sendHtml(res, st, `<h1>${e.message || 'Erro na consulta'}</h1>`, isHead);
       }
     }
@@ -853,6 +914,7 @@ const server = http.createServer(async (req, res) => {
       '/privacidade': seo.renderPrivacidade,
       '/termos': seo.renderTermos,
       '/cookies': seo.renderCookies,
+      '/lgpd': seo.renderLgpd,
     };
     const instKey = pathname.replace(/\/$/, '');
     if (inst[instKey]) {

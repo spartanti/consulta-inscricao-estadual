@@ -258,7 +258,9 @@ form.addEventListener('submit', async (e) => {
     const resp = await fetch(`/api/consulta?cnpj=${cnpj}`);
     const data = await resp.json();
     if (!resp.ok) {
-      showStatus('error', data.erro || 'Não foi possível consultar.');
+      // 410 = dados removidos a pedido do titular (LGPD): destaca com alerta vermelho
+      const pre = resp.status === 410 ? '❗ ' : '';
+      showStatus('error', pre + (data.erro || 'Não foi possível consultar.'));
       return;
     }
     clearStatus();

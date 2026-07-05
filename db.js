@@ -67,6 +67,22 @@ async function init(connStr) {
       PRIMARY KEY (dia, ip_hash)
     );
   `);
+  // Solicitações LGPD (exclusão/confirmação/correção) com número de protocolo.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS lgpd_solicitacoes (
+      protocolo     TEXT PRIMARY KEY,
+      tipo          TEXT NOT NULL,
+      cnpj          TEXT,
+      nome          TEXT NOT NULL,
+      email         TEXT NOT NULL,
+      relacao       TEXT,
+      mensagem      TEXT,
+      status        TEXT NOT NULL DEFAULT 'recebida',
+      resposta      TEXT,
+      criada_em     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      atualizada_em TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
   // unaccent permite busca de município sem depender de acentos.
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS unaccent');
@@ -75,6 +91,34 @@ async function init(connStr) {
     hasUnaccent = false;
   }
   return pool;
+}
+
+// --- Solicitações LGPD ------------------------------------------------------
+
+async function lgpdCreate(rec) {
+  await pool.query(
+    `INSERT INTO lgpd_solicitacoes (protocolo, tipo, cnpj, nome, email, relacao, mensagem)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+    [rec.protocolo, rec.tipo, rec.cnpj || null, rec.nome, rec.email, rec.relacao || null, rec.mensagem || null]
+  );
+  return rec.protocolo;
+}
+
+/** Consulta pública por protocolo: devolve apenas o essencial (sem dados pessoais). */
+async function lgpdGet(protocolo) {
+  const r = await pool.query(
+    `SELECT protocolo, tipo, status, resposta, criada_em, atualizada_em
+     FROM lgpd_solicitacoes WHERE protocolo = $1`, [protocolo]
+  );
+  return r.rows[0] || null;
+}
+
+/** Lista completa (uso administrativo, protegido por STATS_KEY). */
+async function lgpdList(limit = 200) {
+  const r = await pool.query(
+    'SELECT * FROM lgpd_solicitacoes ORDER BY criada_em DESC LIMIT $1', [limit]
+  );
+  return r.rows;
 }
 
 /** Retorna { data, enriquecido_em } ou null. */
@@ -355,4 +399,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, close };
