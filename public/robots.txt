@@ -4,6 +4,7 @@ Allow: /
 Allow: /cnpj/
 Disallow: /stats
 Disallow: /health
+Disallow: /lgpd-admin
 
 # Assistentes de IA e buscadores generativos (livres para ler e citar o site)
 User-agent: GPTBot

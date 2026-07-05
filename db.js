@@ -83,6 +83,15 @@ async function init(connStr) {
       atualizada_em TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // CNPJs bloqueados/excluídos a pedido do titular (LGPD) — fonte da verdade do bloqueio.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS cnpj_removidos (
+      cnpj      TEXT PRIMARY KEY,
+      protocolo TEXT,
+      criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await pool.query(`INSERT INTO cnpj_removidos (cnpj) VALUES ('64048012000179') ON CONFLICT DO NOTHING`);
   // unaccent permite busca de município sem depender de acentos.
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS unaccent');
@@ -119,6 +128,40 @@ async function lgpdList(limit = 200) {
     'SELECT * FROM lgpd_solicitacoes ORDER BY criada_em DESC LIMIT $1', [limit]
   );
   return r.rows;
+}
+
+async function lgpdSetStatus(protocolo, status, resposta) {
+  const r = await pool.query(
+    `UPDATE lgpd_solicitacoes SET status=$2, resposta=COALESCE($3, resposta), atualizada_em=now()
+     WHERE protocolo=$1 RETURNING protocolo`,
+    [protocolo, status, resposta || null]
+  );
+  return r.rowCount > 0;
+}
+
+// --- Bloqueio de CNPJs (LGPD) ------------------------------------------------
+
+async function removedList() {
+  const r = await pool.query('SELECT cnpj, protocolo, criado_em FROM cnpj_removidos ORDER BY criado_em DESC');
+  return r.rows;
+}
+
+async function removedAdd(cnpj, protocolo) {
+  await pool.query(
+    'INSERT INTO cnpj_removidos (cnpj, protocolo) VALUES ($1,$2) ON CONFLICT (cnpj) DO NOTHING',
+    [cnpj, protocolo || null]
+  );
+}
+
+async function removedDel(cnpj) {
+  const r = await pool.query('DELETE FROM cnpj_removidos WHERE cnpj=$1', [cnpj]);
+  return r.rowCount > 0;
+}
+
+/** Apaga o registro da empresa da base (usado na exclusão LGPD). */
+async function removeEmpresa(cnpj) {
+  const r = await pool.query('DELETE FROM empresas WHERE cnpj=$1', [cnpj]);
+  return r.rowCount;
 }
 
 /** Retorna { data, enriquecido_em } ou null. */
@@ -399,4 +442,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, close };

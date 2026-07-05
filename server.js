@@ -262,9 +262,18 @@ function buildResult(data) {
 let cnpjwsCooldownUntil = 0;
 
 // CNPJs removidos a pedido do titular (LGPD): nunca consultar (nem na CNPJ.ws) nem exibir.
+// Cache em memória da tabela cnpj_removidos (seed hardcoded caso o banco esteja fora).
 const CNPJ_REMOVIDOS = new Set([
   '64048012000179',
 ]);
+async function reloadRemovidos() {
+  try {
+    const rows = await db.removedList();
+    CNPJ_REMOVIDOS.clear();
+    CNPJ_REMOVIDOS.add('64048012000179');
+    for (const r of rows) CNPJ_REMOVIDOS.add(r.cnpj);
+  } catch (e) { /* mantém cache atual */ }
+}
 
 async function getCnpjData(cnpj) {
   if (CNPJ_REMOVIDOS.has(cnpj)) {
@@ -698,9 +707,63 @@ const server = http.createServer(async (req, res) => {
         const protocolo = `LGPD-${dt}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
         await db.lgpdCreate({ protocolo, tipo, cnpj: cnpjSol || null, nome, email, relacao, mensagem });
         bump('lgpd_solicitacao');
+        // Exclusão com CNPJ vinculado: aplica na hora (bloqueio + remoção da base),
+        // sem intervenção manual. Reversível pelo painel /lgpd-admin.
+        if (tipo === 'exclusao' && cnpjSol) {
+          try {
+            await db.removedAdd(cnpjSol, protocolo);
+            CNPJ_REMOVIDOS.add(cnpjSol);
+            await db.removeEmpresa(cnpjSol);
+            const hoje = new Date().toLocaleDateString('pt-BR');
+            await db.lgpdSetStatus(protocolo, 'concluida', `Exclusão aplicada automaticamente em ${hoje}. Os dados deixaram de ser exibidos no site e na API.`);
+            return sendJson(res, 201, { protocolo, aplicada: true, prazo: 'Exclusão aplicada imediatamente. As páginas do CNPJ passam a exibir "Dados excluídos em conformidade com a LGPD".' });
+          } catch (e) { /* fica como 'recebida' para tratamento manual */ }
+        }
         return sendJson(res, 201, { protocolo, prazo: 'Retornaremos pelo e-mail informado em até 15 dias (art. 19 da LGPD).' });
       } catch (e) {
         return sendJson(res, 500, { erro: 'Não foi possível registrar a solicitação. Tente novamente ou escreva para admin@spartanti.com.br.' });
+      }
+    });
+    return;
+  }
+
+  // LGPD admin: ações do painel (concluir/negar/excluir/reativar) — exige senha
+  if (req.method === 'POST' && pathname === '/api/lgpd-admin') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 10240) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const b = JSON.parse(body || '{}');
+        if (!process.env.STATS_KEY || b.k !== process.env.STATS_KEY) {
+          return sendJson(res, 401, { erro: 'Senha inválida.' });
+        }
+        const acao = String(b.acao || '');
+        const protocolo = String(b.protocolo || '').trim().toUpperCase();
+        const cnpj = onlyDigits(String(b.cnpj || ''));
+        const resposta = String(b.resposta || '').trim().slice(0, 1000) || null;
+        const hoje = new Date().toLocaleDateString('pt-BR');
+        if (acao === 'concluir' || acao === 'negar') {
+          if (!protocolo) return sendJson(res, 400, { erro: 'Informe o protocolo.' });
+          const ok = await db.lgpdSetStatus(protocolo, acao === 'concluir' ? 'concluida' : 'negada', resposta);
+          return sendJson(res, ok ? 200 : 404, ok ? { ok: true } : { erro: 'Protocolo não encontrado.' });
+        }
+        if (acao === 'excluir') {
+          if (cnpj.length !== 14) return sendJson(res, 400, { erro: 'CNPJ inválido.' });
+          await db.removedAdd(cnpj, protocolo || null);
+          CNPJ_REMOVIDOS.add(cnpj);
+          const n = await db.removeEmpresa(cnpj);
+          if (protocolo) await db.lgpdSetStatus(protocolo, 'concluida', `Exclusão aplicada em ${hoje}.`);
+          return sendJson(res, 200, { ok: true, removidos_da_base: n });
+        }
+        if (acao === 'reativar') {
+          if (cnpj.length !== 14) return sendJson(res, 400, { erro: 'CNPJ inválido.' });
+          await db.removedDel(cnpj);
+          CNPJ_REMOVIDOS.delete(cnpj);
+          return sendJson(res, 200, { ok: true, aviso: 'O CNPJ volta a ser consultável; os dados cadastrais retornam na próxima consulta ou import.' });
+        }
+        return sendJson(res, 400, { erro: 'Ação desconhecida.' });
+      } catch (e) {
+        return sendJson(res, 500, { erro: 'Erro ao executar a ação.' });
       }
     });
     return;
@@ -891,6 +954,22 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, 200, seo.renderWidget(), isHead);
     }
 
+    // Painel LGPD: solicitações + CNPJs excluídos (protegido por senha)
+    if (pathname === '/lgpd-admin' || pathname === '/lgpd-admin/') {
+      res.setHeader('Cache-Control', 'no-store');
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+      const k = urlObj.searchParams.get('k') || '';
+      if (!process.env.STATS_KEY || k !== process.env.STATS_KEY) {
+        return sendHtml(res, k ? 401 : 200, seo.renderLgpdAdminLogin(Boolean(k)), isHead);
+      }
+      try {
+        const [sols, removidos] = await Promise.all([db.lgpdList(500), db.removedList()]);
+        return sendHtml(res, 200, seo.renderLgpdAdmin(sols, removidos, k), isHead);
+      } catch (e) {
+        return sendHtml(res, 500, '<h1>Erro ao carregar o painel LGPD</h1>', isHead);
+      }
+    }
+
     // Painel de métricas (analytics de primeira mão)
     if (pathname === '/stats' || pathname === '/stats/') {
       if (process.env.STATS_KEY && urlObj.searchParams.get('k') !== process.env.STATS_KEY) {
@@ -935,6 +1014,8 @@ const server = http.createServer(async (req, res) => {
   try {
     await db.init(process.env.DATABASE_URL);
     console.log('Storage: PostgreSQL conectado.');
+    await reloadRemovidos();
+    setInterval(reloadRemovidos, 5 * 60 * 1000).unref();
   } catch (e) {
     // App continua no ar: consultas ainda funcionam via API (sem persistir).
     console.error('PostgreSQL indisponível (seguindo sem persistência):', e.message);

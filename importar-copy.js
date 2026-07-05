@@ -88,6 +88,13 @@ function streamZip(file, onLine) {
   // staging UNLOGGED (rápida, sem índice)
   await pool.query(`CREATE UNLOGGED TABLE IF NOT EXISTS ${STG} (cnpj text, razao_social text, nome_fantasia text, uf text, municipio text, cnae_codigo text, cnae_descricao text, situacao_cadastral text, data jsonb)`);
 
+  // Bloqueios LGPD dinâmicos (tabela cnpj_removidos) somados aos hardcoded
+  try {
+    const rem = await pool.query('SELECT cnpj FROM cnpj_removidos');
+    for (const r of rem.rows) CNPJ_REMOVIDOS.add(r.cnpj);
+    console.log(`Removidos (LGPD): ${CNPJ_REMOVIDOS.size}`);
+  } catch (e) { /* tabela pode não existir ainda */ }
+
   // mapas de apoio
   const muniMap = {}; const cnaeMap = {}; const qualMap = {};
   await streamZip('Municipios.zip', (f) => { muniMap[f[0]] = f[1]; });

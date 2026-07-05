@@ -839,11 +839,11 @@ function renderLgpd() {
     <h2>Como funciona</h2>
     <ol>
       <li>Preencha o formulário abaixo. Você recebe na hora um <strong>número de protocolo</strong>.</li>
-      <li>Analisamos o pedido conforme a LGPD e respondemos pelo e-mail informado em até
-      <strong>15 dias</strong> (art. 19, II, da LGPD).</li>
-      <li>Confirmada a exclusão, as páginas do CNPJ passam a exibir
-      <em>“❗ Dados excluídos em conformidade com a LGPD”</em> e os dados deixam de ser servidos
-      pelo site e pela API.</li>
+      <li>Pedidos de <strong>exclusão com CNPJ informado</strong> são aplicados
+      <strong>imediatamente</strong>: os dados deixam de ser exibidos no site e na API na hora, e as
+      páginas do CNPJ passam a mostrar <em>“❗ Dados excluídos em conformidade com a LGPD”</em>.</li>
+      <li>Os demais pedidos (confirmação, correção) são analisados conforme a LGPD e respondidos pelo
+      e-mail informado em até <strong>15 dias</strong> (art. 19, II, da LGPD).</li>
       <li>Acompanhe o andamento a qualquer momento pelo protocolo, no campo ao final desta página.</li>
     </ol>
     <p class="muted">Importante: dados cadastrais de empresas (CNPJ, razão social, endereço, CNAE) são
@@ -947,6 +947,124 @@ function renderLgpd() {
     inner,
     'Exclusão de Dados'
   );
+}
+
+// --- Painel administrativo LGPD (protegido por senha) ---
+const esc = escapeHtml;
+
+function renderLgpdAdminLogin(erro) {
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Painel LGPD — acesso restrito</title>
+<style>body{font-family:system-ui,sans-serif;background:#f2f5f9;display:grid;place-items:center;min-height:100vh;margin:0}
+form{background:#fff;padding:32px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.08);display:grid;gap:12px;width:300px}
+h1{font-size:18px;margin:0}input,button{padding:10px;border-radius:8px;font-size:15px}
+input{border:1px solid #ccc}button{border:none;background:#0b4f9e;color:#fff;font-weight:600;cursor:pointer}
+.err{color:#c0392b;font-size:14px;margin:0}</style></head><body>
+<form method="get" action="/lgpd-admin">
+  <h1>🔒 Painel LGPD</h1>
+  ${erro ? '<p class="err">Senha incorreta.</p>' : ''}
+  <input type="password" name="k" placeholder="Senha" required autofocus>
+  <button type="submit">Entrar</button>
+</form></body></html>`;
+}
+
+function renderLgpdAdmin(sols, removidos, key) {
+  const ST = {
+    recebida: ['Recebida', '#e67e22'], em_analise: ['Em análise', '#2980b9'],
+    concluida: ['Concluída', '#27ae60'], negada: ['Negada', '#c0392b'],
+  };
+  const badge = (s) => {
+    const [label, cor] = ST[s] || [s, '#777'];
+    return `<span style="background:${cor};color:#fff;padding:2px 10px;border-radius:99px;font-size:12px;white-space:nowrap">${esc(label)}</span>`;
+  };
+  const fmtCnpj = (c) => (c && c.length === 14 ? c.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : '—');
+  const dt = (d) => new Date(d).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
+  const pend = sols.filter((s) => s.status === 'recebida' || s.status === 'em_analise').length;
+
+  const linhas = sols.map((s) => `
+    <tr>
+      <td><code>${esc(s.protocolo)}</code><br><small>${dt(s.criada_em)}</small></td>
+      <td>${esc(s.tipo)}</td>
+      <td>${fmtCnpj(s.cnpj)}</td>
+      <td>${esc(s.nome)}<br><small><a href="mailto:${esc(s.email)}">${esc(s.email)}</a> · ${esc(s.relacao || '—')}</small></td>
+      <td class="msg">${esc(s.mensagem || '')}${s.resposta ? `<br><small><strong>Resposta:</strong> ${esc(s.resposta)}</small>` : ''}</td>
+      <td>${badge(s.status)}</td>
+      <td class="acoes">
+        ${s.status === 'recebida' || s.status === 'em_analise' ? `
+          <button onclick="acao('concluir','${esc(s.protocolo)}')">✔ Concluir</button>
+          <button onclick="acao('negar','${esc(s.protocolo)}')">✖ Negar</button>
+          ${s.cnpj ? `<button onclick="acao('excluir','${esc(s.protocolo)}','${esc(s.cnpj)}')">🗑 Excluir CNPJ</button>` : ''}` : ''}
+      </td>
+    </tr>`).join('');
+
+  const linhasRem = removidos.map((r) => `
+    <tr>
+      <td><code>${fmtCnpj(r.cnpj)}</code></td>
+      <td>${r.protocolo ? `<code>${esc(r.protocolo)}</code>` : '—'}</td>
+      <td>${dt(r.criado_em)}</td>
+      <td><button onclick="acao('reativar',null,'${esc(r.cnpj)}')">↩ Reativar</button></td>
+    </tr>`).join('');
+
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">
+<title>Painel LGPD — SINTEGRA Brasil</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#f2f5f9;margin:0;padding:24px;color:#222}
+h1{font-size:22px}h2{font-size:17px;margin-top:32px}
+.cards{display:flex;gap:12px;flex-wrap:wrap;margin:16px 0}
+.card{background:#fff;border-radius:10px;padding:14px 20px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.card strong{font-size:22px;display:block}
+.tabela{overflow-x:auto;background:#fff;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:10px 12px;text-align:left;border-bottom:1px solid #eee;vertical-align:top}
+th{background:#0b4f9e;color:#fff;position:sticky;top:0}
+tr:hover td{background:#f8fafd}
+.msg{max-width:340px}code{font-size:12px}
+button{padding:6px 10px;border:none;border-radius:6px;background:#0b4f9e;color:#fff;cursor:pointer;font-size:12px;margin:2px}
+button:hover{opacity:.85}
+small{color:#666}
+.aviso{background:#fff8e6;border:1px solid #f1d78a;border-radius:8px;padding:10px 14px;font-size:13px;margin:12px 0}
+</style></head><body>
+<h1>🔒 Painel LGPD — solicitações de exclusão de dados</h1>
+<div class="cards">
+  <div class="card"><strong>${sols.length}</strong> solicitações</div>
+  <div class="card"><strong>${pend}</strong> pendentes</div>
+  <div class="card"><strong>${removidos.length}</strong> CNPJs excluídos</div>
+</div>
+<p class="aviso">⚙️ Pedidos de <strong>exclusão com CNPJ</strong> são aplicados <strong>automaticamente</strong>
+(bloqueio + remoção da base + protocolo concluído). Use <em>Reativar</em> abaixo para reverter um pedido
+indevido/abusivo. Demais tipos (confirmação, correção) aguardam sua ação.</p>
+
+<h2>Solicitações</h2>
+<div class="tabela"><table>
+  <thead><tr><th>Protocolo</th><th>Tipo</th><th>CNPJ</th><th>Solicitante</th><th>Mensagem</th><th>Status</th><th>Ações</th></tr></thead>
+  <tbody>${linhas || '<tr><td colspan="7">Nenhuma solicitação.</td></tr>'}</tbody>
+</table></div>
+
+<h2>CNPJs excluídos (bloqueados no site e na API)</h2>
+<div class="tabela"><table>
+  <thead><tr><th>CNPJ</th><th>Protocolo</th><th>Desde</th><th>Ações</th></tr></thead>
+  <tbody>${linhasRem || '<tr><td colspan="4">Nenhum CNPJ bloqueado.</td></tr>'}</tbody>
+</table></div>
+
+<script>
+function acao(a, protocolo, cnpj) {
+  var resposta = null;
+  if (a === 'concluir' || a === 'negar') {
+    resposta = prompt('Resposta ao titular (aparece na consulta do protocolo):', '');
+    if (resposta === null) return;
+  }
+  if (a === 'excluir' && !confirm('Excluir o CNPJ ' + cnpj + ' do site e da API?')) return;
+  if (a === 'reativar' && !confirm('Reativar o CNPJ ' + cnpj + '? Ele volta a ser exibido.')) return;
+  fetch('/api/lgpd-admin', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ k: ${JSON.stringify(key)}, acao: a, protocolo: protocolo, cnpj: cnpj, resposta: resposta }) })
+    .then(function (r) { return r.json(); })
+    .then(function (j) { if (j.erro) alert(j.erro); else location.reload(); })
+    .catch(function () { alert('Erro de conexão.'); });
+}
+</script>
+</body></html>`;
 }
 
 function renderTermos() {
@@ -1572,6 +1690,8 @@ module.exports = {
   renderPrivacidade,
   renderTermos,
   renderLgpd,
+  renderLgpdAdmin,
+  renderLgpdAdminLogin,
   renderValidador,
   renderWidget,
   renderEmbed,
