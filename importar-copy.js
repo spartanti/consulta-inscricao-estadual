@@ -23,6 +23,8 @@ const { DatabaseSync } = require('node:sqlite');
 const { parseCsvLine, buildEstabData } = require('./importar-receita');
 
 const LOCAL_DIR = process.env.LOCAL_DIR;
+// CNPJs removidos a pedido do titular (LGPD) — manter em sincronia com server.js
+const CNPJ_REMOVIDOS = new Set(['64048012000179']);
 const CHUNK = parseInt(process.env.CHUNK || '20000', 10) || 20000;
 const LIMIT = parseInt(process.env.LIMIT || '0', 10) || 0;
 const SOMENTE_ATIVAS = process.env.SOMENTE_ATIVAS === '1';
@@ -147,6 +149,7 @@ function streamZip(file, onLine) {
       const emp = e ? { razao: e.razao, natureza: e.natureza, porte: e.porte, capital: e.capital } : null;
       const d = buildEstabData(c, emp, muniMap, cnaeMap);
       if (!/^\d{14}$/.test(d.cnpj)) return;
+      if (CNPJ_REMOVIDOS.has(d.cnpj)) return; // removido a pedido do titular (LGPD)
       const socios = getSoc.all(c[0]);
       if (socios.length) d.socios = socios.map((s) => ({ nome: s.nome, qualificacao: s.qual, faixa_etaria: s.faixa, data_entrada: s.dt }));
       buf.push(rowCsv(d));

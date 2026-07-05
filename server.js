@@ -261,7 +261,15 @@ function buildResult(data) {
 // em vez de martelar a API — assim o orçamento de 3/min se recupera.
 let cnpjwsCooldownUntil = 0;
 
+// CNPJs removidos a pedido do titular (LGPD): nunca consultar (nem na CNPJ.ws) nem exibir.
+const CNPJ_REMOVIDOS = new Set([
+  '64048012000179',
+]);
+
 async function getCnpjData(cnpj) {
+  if (CNPJ_REMOVIDOS.has(cnpj)) {
+    throw { status: 410, message: 'Dados excluídos por solicitação' };
+  }
   let row = null;
   try { row = await db.getRow(cnpj); } catch (e) { /* banco indisponivel */ }
   // Já temos IE (enriquecido) → cache, sem tocar a CNPJ.ws.
@@ -744,7 +752,8 @@ const server = http.createServer(async (req, res) => {
         const data = await getCnpjData(cnpj);
         return sendHtml(res, 200, seo.renderCnpjPage(data, cnpj), isHead);
       } catch (e) {
-        return sendHtml(res, e.status === 404 ? 404 : 502, `<h1>${e.message || 'Erro na consulta'}</h1>`, isHead);
+        const st = e.status === 404 || e.status === 410 || e.status === 429 ? e.status : 502;
+        return sendHtml(res, st, `<h1>${e.message || 'Erro na consulta'}</h1>`, isHead);
       }
     }
 
