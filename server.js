@@ -569,6 +569,30 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
+  // API PÚBLICA: radar de empresas novas
+  if (req.method === 'GET' && pathname === '/api/v1/radar') {
+    setCors(res);
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
+    }
+    const f = {
+      uf: (urlObj.searchParams.get('uf') || '').trim().toUpperCase().slice(0, 2),
+      municipio: (urlObj.searchParams.get('municipio') || '').trim().slice(0, 60),
+      cnae: (urlObj.searchParams.get('cnae') || '').trim().slice(0, 60),
+      dias: Math.min(parseInt(urlObj.searchParams.get('dias') || '30', 10) || 30, 90),
+      limit: Math.min(parseInt(urlObj.searchParams.get('limit') || '50', 10) || 50, 100),
+      offset: Math.max(parseInt(urlObj.searchParams.get('offset') || '0', 10) || 0, 0),
+    };
+    try {
+      const [rows, info] = await Promise.all([db.radarList(f), db.radarInfo()]);
+      bump('api_radar');
+      return sendJson(res, 200, { atualizado_ate: info.ultima, resultados: rows });
+    } catch (e) {
+      return sendJson(res, 500, { erro: 'Radar indisponível no momento.' });
+    }
+  }
+
   // API PÚBLICA: busca filtrada por CNAE/UF/município/nome
   if (req.method === 'GET' && pathname === '/api/v1/buscar') {
     setCors(res);
@@ -830,6 +854,7 @@ const server = http.createServer(async (req, res) => {
         { loc: `${seo.SITE_URL}/sobre`, priority: '0.4' },
         { loc: `${seo.SITE_URL}/sobre-os-dados`, priority: '0.5' },
         { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
+        { loc: `${seo.SITE_URL}/radar`, priority: '0.8' },
         { loc: `${seo.SITE_URL}/privacidade`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/termos`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/lgpd`, priority: '0.3' },
@@ -862,6 +887,43 @@ const server = http.createServer(async (req, res) => {
       return html ? sendHtml(res, 200, html, isHead) : sendHtml(res, 404, '<h1>Estado não encontrado</h1>', isHead);
     }
 
+    // Ficha cadastral para impressão: /cnpj/:cnpj/ficha
+    m = pathname.match(/^\/cnpj\/(\d{14})\/ficha\/?$/);
+    if (m) {
+      const cnpj = m[1];
+      if (!isValidCnpj(cnpj)) return sendHtml(res, 404, '<h1>CNPJ inválido</h1>', isHead);
+      bump('ficha_cnpj');
+      try {
+        const data = await getCnpjData(cnpj);
+        const QRCode = require('qrcode-svg');
+        const qr = new QRCode({ content: `${seo.SITE_URL}/cnpj/${cnpj}`, width: 110, height: 110, padding: 0, join: true }).svg();
+        return sendHtml(res, 200, seo.renderFicha(data, cnpj, qr), isHead);
+      } catch (e) {
+        const st = e.status === 404 || e.status === 410 || e.status === 429 ? e.status : 502;
+        return sendHtml(res, st, `<h1>${e.message || 'Erro na consulta'}</h1>`, isHead);
+      }
+    }
+
+    // Radar de empresas novas
+    if (pathname === '/radar' || pathname === '/radar/') {
+      bump('radar');
+      const p = Math.max(parseInt(urlObj.searchParams.get('p') || '1', 10) || 1, 1);
+      const f = {
+        uf: (urlObj.searchParams.get('uf') || '').trim().toUpperCase().slice(0, 2),
+        municipio: (urlObj.searchParams.get('municipio') || '').trim().slice(0, 60),
+        cnae: (urlObj.searchParams.get('cnae') || '').trim().slice(0, 60),
+        dias: Math.min(parseInt(urlObj.searchParams.get('dias') || '30', 10) || 30, 90),
+        limit: 50,
+        offset: (p - 1) * 50,
+      };
+      try {
+        const [rows, info] = await Promise.all([db.radarList(f), db.radarInfo()]);
+        return sendHtml(res, 200, seo.renderRadar(rows, f, info, p), isHead);
+      } catch (e) {
+        return sendHtml(res, 200, seo.renderRadar([], f, { total: 0 }, 1), isHead);
+      }
+    }
+
     // Paginas por CNPJ: /cnpj/:cnpj
     m = pathname.match(/^\/cnpj\/(\d{14})\/?$/);
     if (m) {
@@ -870,7 +932,19 @@ const server = http.createServer(async (req, res) => {
       bump('pagina_cnpj');
       try {
         const data = await getCnpjData(cnpj);
-        return sendHtml(res, 200, seo.renderCnpjPage(data, cnpj), isHead);
+        // Extras da página (melhor esforço): matriz/filiais e empresas relacionadas
+        let extra = null;
+        try {
+          const basico = cnpj.slice(0, 8);
+          const [filiais, totalFiliais] = await Promise.all([db.listFiliais(basico, 200), db.countFiliais(basico)]);
+          let relacionadas = [];
+          const nomes = (data.socios || []).map((s) => s.nome).filter(Boolean).slice(0, 10);
+          if (nomes.length) {
+            try { relacionadas = await db.relacionadasPorSocios(nomes, basico, 12); } catch (e) {}
+          }
+          extra = { filiais, totalFiliais, relacionadas };
+        } catch (e) { /* banco ocupado: página sai sem os extras */ }
+        return sendHtml(res, 200, seo.renderCnpjPage(data, cnpj, extra), isHead);
       } catch (e) {
         const st = e.status === 404 || e.status === 410 || e.status === 429 ? e.status : 502;
         if (st === 410) {

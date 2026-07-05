@@ -247,7 +247,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css?v=21" />
+  <link rel="stylesheet" href="/style.css?v=22" />
   ${bc}
   ${gaSnippet()}
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1697859368408278" crossorigin="anonymous"></script>
@@ -351,8 +351,51 @@ function renderStatePage(ufRaw) {
   return layout({ title, description, canonical, bodyHtml, breadcrumb });
 }
 
-/** data = saida do buildResult(); cnpj = 14 digitos. QSA fica fora (privacidade). */
-function renderCnpjPage(data, cnpj) {
+/** Bloco "Matriz e filiais" da página do CNPJ. */
+function filiaisHtml(cnpj, extra) {
+  const fil = (extra && extra.filiais) || [];
+  if (fil.length < 2) return ''; // só a própria empresa
+  const total = (extra && extra.totalFiliais) || fil.length;
+  const linhas = fil.map((f) => {
+    const tipo = f.cnpj.slice(8, 12) === '0001' ? 'Matriz' : 'Filial';
+    const atual = f.cnpj === cnpj ? ' <span class="tag on">esta página</span>' : '';
+    return `<tr>
+      <td><a href="/cnpj/${f.cnpj}">${maskCnpj(f.cnpj)}</a>${atual}</td>
+      <td>${tipo}</td>
+      <td>${escapeHtml([f.municipio, f.uf].filter(Boolean).join(' / ') || '—')}</td>
+      <td>${escapeHtml(f.situacao_cadastral || '—')}</td>
+    </tr>`;
+  }).join('');
+  const nota = total > fil.length ? `<p class="muted">Mostrando ${fil.length} de ${total} estabelecimentos.</p>` : '';
+  return `
+      <h2 class="sec-title">🏢 Matriz e filiais (${total} estabelecimento${total > 1 ? 's' : ''})</h2>
+      <div class="tabela-scroll"><table class="details-table filiais-table">
+        <thead><tr><th>CNPJ</th><th>Tipo</th><th>Município/UF</th><th>Situação</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table></div>${nota}`;
+}
+
+/** Bloco "Empresas relacionadas" (sócios em comum) da página do CNPJ. */
+function relacionadasHtml(extra) {
+  const rel = (extra && extra.relacionadas) || [];
+  if (!rel.length) return '';
+  const linhas = rel.map((r) => `<tr>
+      <td><a href="/cnpj/${r.cnpj}">${escapeHtml(r.razao_social || maskCnpj(r.cnpj))}</a></td>
+      <td>${escapeHtml(r.socio || '—')}</td>
+      <td>${escapeHtml([r.municipio, r.uf].filter(Boolean).join(' / ') || '—')}</td>
+      <td>${escapeHtml(r.situacao_cadastral || '—')}</td>
+    </tr>`).join('');
+  return `
+      <h2 class="sec-title">🔗 Empresas relacionadas (sócios em comum)</h2>
+      <div class="tabela-scroll"><table class="details-table">
+        <thead><tr><th>Empresa</th><th>Sócio em comum</th><th>Município/UF</th><th>Situação</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table></div>`;
+}
+
+/** data = saida do buildResult(); cnpj = 14 digitos. QSA fica fora (privacidade).
+ *  extra = { filiais: [...], totalFiliais: n, relacionadas: [...] } (opcional). */
+function renderCnpjPage(data, cnpj, extra) {
   const masked = maskCnpj(cnpj);
   const razao = data.razao_social || 'Empresa';
   const canonical = `${SITE_URL}/cnpj/${cnpj}`;
@@ -417,6 +460,11 @@ function renderCnpjPage(data, cnpj) {
         ${row('Endereço', enderecoStr)}
         ${data.atividade_principal ? row('Atividade principal', data.atividade_principal.codigo + ' - ' + data.atividade_principal.descricao) : ''}
       </tbody></table>
+
+      <p class="ficha-cta"><a class="btn-ficha" href="/cnpj/${cnpj}/ficha" rel="nofollow">📄 Ficha cadastral para impressão (PDF)</a></p>
+
+      ${filiaisHtml(cnpj, extra)}
+      ${relacionadasHtml(extra)}
 
       <h2 class="sec-title">Consultar outro CNPJ</h2>
       ${searchForm()}
@@ -947,6 +995,149 @@ function renderLgpd() {
     inner,
     'Exclusão de Dados'
   );
+}
+
+// --- Radar de empresas novas -------------------------------------------------
+function renderRadar(rows, f, info, pagina) {
+  const canonical = `${SITE_URL}/radar`;
+  const ufOpts = ['', ...UFS].map((u) => `<option value="${u}" ${f.uf === u ? 'selected' : ''}>${u || 'Todas as UFs'}</option>`).join('');
+  const diasOpts = [7, 30, 60, 90].map((d) => `<option value="${d}" ${Number(f.dias) === d ? 'selected' : ''}>Últimos ${d} dias</option>`).join('');
+  const linhas = rows.map((r) => `<tr>
+      <td><a href="/cnpj/${r.cnpj}">${escapeHtml(r.razao_social || maskCnpj(r.cnpj))}</a>${r.nome_fantasia ? `<br><small class="muted">${escapeHtml(r.nome_fantasia)}</small>` : ''}</td>
+      <td>${r.inicio || '—'}</td>
+      <td>${escapeHtml([r.municipio, r.uf].filter(Boolean).join(' / ') || '—')}</td>
+      <td>${escapeHtml(r.cnae_descricao || r.cnae_codigo || '—')}</td>
+      <td>${escapeHtml(r.porte || '—')}</td>
+    </tr>`).join('');
+  const qs = (p) => {
+    const s = new URLSearchParams();
+    if (f.uf) s.set('uf', f.uf);
+    if (f.municipio) s.set('municipio', f.municipio);
+    if (f.cnae) s.set('cnae', f.cnae);
+    if (f.dias) s.set('dias', f.dias);
+    if (p > 1) s.set('p', p);
+    const str = s.toString();
+    return str ? `/radar?${str}` : '/radar';
+  };
+  const nav = `<nav class="radar-pag">
+      ${pagina > 1 ? `<a class="btn" href="${qs(pagina - 1)}">← Anteriores</a>` : ''}
+      ${rows.length >= 50 ? `<a class="btn" href="${qs(pagina + 1)}">Próximas →</a>` : ''}
+    </nav>`;
+  const vazio = info && info.total === 0
+    ? '<p class="muted">O radar está sendo carregado com os dados mais recentes da Receita Federal. Volte em alguns minutos.</p>'
+    : (rows.length ? '' : '<p class="muted">Nenhuma empresa encontrada com esses filtros.</p>');
+
+  const bodyHtml = `
+    <article class="card">
+      <h1>📡 Radar de empresas novas</h1>
+      <p>Empresas <strong>recém-abertas no Brasil</strong>, direto da base da Receita Federal — filtre por
+      estado, município e atividade (CNAE). Útil para prospecção B2B, contadores, bancos e fornecedores.
+      ${info && info.ultima ? `<span class="muted">Dados até ${info.ultima}.</span>` : ''}</p>
+      <form class="radar-filtros" method="get" action="/radar">
+        <select name="uf" aria-label="Estado">${ufOpts}</select>
+        <input type="text" name="municipio" placeholder="Município" value="${escapeHtml(f.municipio || '')}">
+        <input type="text" name="cnae" placeholder="CNAE ou atividade (ex.: restaurante)" value="${escapeHtml(f.cnae || '')}">
+        <select name="dias" aria-label="Período">${diasOpts}</select>
+        <button type="submit">Filtrar</button>
+      </form>
+      ${vazio || `<div class="tabela-scroll"><table class="details-table radar-table">
+        <thead><tr><th>Empresa</th><th>Abertura</th><th>Município/UF</th><th>Atividade</th><th>Porte</th></tr></thead>
+        <tbody>${linhas}</tbody>
+      </table></div>${nav}`}
+      <p class="source">Fonte: Dados Abertos da Receita Federal (CNPJ). Atualização mensal.</p>
+    </article>
+    ${datasetLd('Empresas recém-abertas no Brasil (Radar)', canonical, 'Empresas abertas recentemente no Brasil segundo a Receita Federal, com filtros por estado, município e atividade econômica (CNAE). Atualização mensal.')}`;
+
+  return layout({
+    title: 'Radar de empresas novas — empresas abertas recentemente por cidade e CNAE',
+    description: 'Veja empresas recém-abertas no Brasil: filtre por estado, município e atividade (CNAE). Dados da Receita Federal, grátis. Ideal para prospecção e leads B2B.',
+    canonical,
+    bodyHtml,
+    breadcrumb: {
+      '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE_URL}/` },
+        { '@type': 'ListItem', position: 2, name: 'Radar de empresas novas', item: canonical },
+      ],
+    },
+  });
+}
+
+// --- Ficha cadastral para impressão (A4 + QR) ---------------------------------
+function renderFicha(data, cnpj, qrSvg) {
+  const masked = maskCnpj(cnpj);
+  const razao = data.razao_social || 'Empresa';
+  const url = `${SITE_URL}/cnpj/${cnpj}`;
+  const end = data.endereco || {};
+  const enderecoStr = [end.logradouro, end.bairro, [end.municipio, end.uf].filter(Boolean).join(' / '), end.cep].filter(Boolean).join(', ');
+  const ies = data.inscricoes_estaduais || [];
+  const socios = data.socios || [];
+  const ativSec = data.atividades_secundarias || [];
+  const agora = new Date().toLocaleString('pt-BR', { dateStyle: 'long', timeStyle: 'short' });
+  const linha = (k, v) => (v ? `<tr><th>${k}</th><td>${escapeHtml(v)}</td></tr>` : '');
+
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow"><link rel="canonical" href="${url}">
+<title>Ficha cadastral — ${escapeHtml(razao)} (${masked})</title>
+<style>
+  :root{--azul:#0b4f9e;--cinza:#555}
+  *{box-sizing:border-box}body{font-family:system-ui,-apple-system,sans-serif;color:#1c1c1c;margin:0;background:#eef1f5}
+  .folha{max-width:800px;margin:16px auto;background:#fff;padding:34px 40px;box-shadow:0 2px 12px rgba(0,0,0,.12)}
+  header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid var(--azul);padding-bottom:14px;margin-bottom:18px}
+  .marca{font-size:20px;font-weight:800;color:var(--azul)}.marca small{display:block;font-weight:400;color:var(--cinza);font-size:12px}
+  h1{font-size:19px;margin:14px 0 2px}.cnpj-big{font-size:15px;color:var(--cinza);margin:0 0 14px}
+  h2{font-size:14px;text-transform:uppercase;letter-spacing:.5px;color:var(--azul);border-bottom:1px solid #dde4ee;padding-bottom:4px;margin:20px 0 8px}
+  table{width:100%;border-collapse:collapse;font-size:13.5px}
+  th,td{text-align:left;padding:6px 8px;border-bottom:1px solid #f0f2f6;vertical-align:top}
+  th{width:190px;color:var(--cinza);font-weight:600}
+  .qr{ text-align:center }.qr svg{width:110px;height:110px}.qr small{display:block;color:var(--cinza);font-size:10.5px;max-width:130px}
+  .tag{display:inline-block;padding:1px 10px;border-radius:99px;font-size:12px;color:#fff;background:#27ae60}
+  .tag.off{background:#c0392b}
+  footer{margin-top:24px;border-top:1px solid #dde4ee;padding-top:10px;font-size:11.5px;color:var(--cinza)}
+  .toolbar{max-width:800px;margin:12px auto;display:flex;gap:10px;justify-content:flex-end}
+  .toolbar button,.toolbar a{padding:10px 18px;border:none;border-radius:8px;background:var(--azul);color:#fff;font-weight:600;cursor:pointer;text-decoration:none;font-size:14px}
+  @media print{body{background:#fff}.folha{box-shadow:none;margin:0;max-width:none;padding:10mm 12mm}.toolbar{display:none}}
+</style></head><body>
+<div class="toolbar">
+  <a href="${url}">← Voltar à consulta</a>
+  <button onclick="window.print()">🖨 Imprimir / Salvar em PDF</button>
+</div>
+<div class="folha">
+  <header>
+    <div class="marca">SINTEGRA Brasil<small>sintegrabrasil.com.br — consulta gratuita de CNPJ e Inscrição Estadual</small></div>
+    <div class="qr">${qrSvg}<small>Confira esta ficha online</small></div>
+  </header>
+
+  <h1>${escapeHtml(razao)}</h1>
+  <p class="cnpj-big">CNPJ ${masked}${data.nome_fantasia ? ' · ' + escapeHtml(data.nome_fantasia) : ''}</p>
+
+  <h2>Dados cadastrais</h2>
+  <table>
+    ${linha('Situação cadastral', data.situacao_cadastral)}
+    ${linha('Natureza jurídica', data.natureza_juridica)}
+    ${linha('Porte', data.porte)}
+    ${linha('Capital social', data.capital_social ? 'R$ ' + Number(data.capital_social).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : null)}
+    ${linha('Início de atividade', data.data_inicio_atividade)}
+    ${linha('Endereço', enderecoStr)}
+    ${data.atividade_principal ? linha('Atividade principal', `${data.atividade_principal.codigo} — ${data.atividade_principal.descricao}`) : ''}
+  </table>
+
+  ${ativSec.length ? `<h2>Atividades secundárias</h2><table>${ativSec.slice(0, 12).map((a) => `<tr><th>${escapeHtml(a.codigo || '')}</th><td>${escapeHtml(a.descricao || '')}</td></tr>`).join('')}</table>` : ''}
+
+  <h2>Inscrições Estaduais (SINTEGRA)</h2>
+  ${ies.length ? `<table>${ies.map((ie) => `<tr><th>${escapeHtml(ie.uf || '—')}</th><td>${escapeHtml(ie.inscricao_estadual)} <span class="tag ${ie.ativo ? '' : 'off'}">${ie.ativo ? 'Ativa' : 'Baixada/Inativa'}</span></td></tr>`).join('')}</table>`
+    : '<p style="font-size:13.5px;color:var(--cinza)">Nenhuma Inscrição Estadual encontrada para este CNPJ.</p>'}
+
+  ${socios.length ? `<h2>Quadro societário (QSA)</h2><table>${socios.slice(0, 20).map((s) => `<tr><th>${escapeHtml(s.qualificacao || 'Sócio')}</th><td>${escapeHtml(s.nome || '')}${s.data_entrada ? ` <small style="color:var(--cinza)">desde ${escapeHtml(s.data_entrada)}</small>` : ''}</td></tr>`).join('')}</table>` : ''}
+
+  <footer>
+    Documento <strong>meramente informativo</strong>, gerado em ${agora} a partir de dados públicos
+    (Receita Federal / SEFAZ). Não substitui certidões oficiais. Verifique a versão atual em
+    <strong>${url.replace('https://', '')}</strong> (QR code no topo).
+  </footer>
+</div>
+</body></html>`;
 }
 
 // --- Painel administrativo LGPD (protegido por senha) ---
@@ -1692,6 +1883,8 @@ module.exports = {
   renderLgpd,
   renderLgpdAdmin,
   renderLgpdAdminLogin,
+  renderRadar,
+  renderFicha,
   renderValidador,
   renderWidget,
   renderEmbed,

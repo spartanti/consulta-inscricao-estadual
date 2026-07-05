@@ -92,6 +92,30 @@ async function init(connStr) {
     );
   `);
   await pool.query(`INSERT INTO cnpj_removidos (cnpj) VALUES ('64048012000179') ON CONFLICT DO NOTHING`);
+  // Radar de empresas novas: tabela pequena, recarregada a cada import mensal.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS radar_novas (
+      cnpj           TEXT PRIMARY KEY,
+      razao_social   TEXT,
+      nome_fantasia  TEXT,
+      uf             TEXT,
+      municipio      TEXT,
+      cnae_codigo    TEXT,
+      cnae_descricao TEXT,
+      porte          TEXT,
+      data_inicio    DATE
+    );
+  `);
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_radar_inicio ON radar_novas(data_inicio DESC);');
+  await pool.query('CREATE INDEX IF NOT EXISTS idx_radar_uf ON radar_novas(uf);');
+  // Sócios (QSA) para "empresas relacionadas" — carregada após o import nacional.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS socios (
+      cnpj_basico TEXT NOT NULL,
+      nome        TEXT NOT NULL,
+      qualificacao TEXT
+    );
+  `);
   // unaccent permite busca de município sem depender de acentos.
   try {
     await pool.query('CREATE EXTENSION IF NOT EXISTS unaccent');
@@ -162,6 +186,82 @@ async function removedDel(cnpj) {
 async function removeEmpresa(cnpj) {
   const r = await pool.query('DELETE FROM empresas WHERE cnpj=$1', [cnpj]);
   return r.rowCount;
+}
+
+// --- Matriz e filiais --------------------------------------------------------
+// Os 8 primeiros dígitos (CNPJ básico) identificam a empresa; usa a faixa do PK
+// (nenhum índice extra necessário).
+
+async function listFiliais(basico, limit = 200) {
+  const r = await pool.query(
+    `SELECT cnpj, razao_social, nome_fantasia, uf, municipio, situacao_cadastral,
+            data->>'data_inicio_atividade' AS inicio
+     FROM empresas WHERE cnpj >= $1 AND cnpj <= $2 ORDER BY cnpj LIMIT $3`,
+    [basico + '000000', basico + '999999', limit]
+  );
+  return r.rows;
+}
+
+async function countFiliais(basico) {
+  const r = await pool.query(
+    'SELECT COUNT(*)::int AS c FROM empresas WHERE cnpj >= $1 AND cnpj <= $2',
+    [basico + '000000', basico + '999999']
+  );
+  return r.rows[0].c;
+}
+
+// --- Radar de empresas novas -------------------------------------------------
+
+async function radarList(f = {}) {
+  const where = []; const params = [];
+  if (f.uf) { params.push(f.uf.toUpperCase()); where.push(`uf = $${params.length}`); }
+  if (f.municipio) { params.push(`%${f.municipio}%`); where.push(`municipio ILIKE $${params.length}`); }
+  if (f.cnae) {
+    params.push(`${String(f.cnae).replace(/\D/g, '')}%`); const pCod = params.length;
+    params.push(`%${f.cnae}%`); const pDesc = params.length;
+    where.push(`(cnae_codigo LIKE $${pCod} OR cnae_descricao ILIKE $${pDesc})`);
+  }
+  if (f.dias) { params.push(f.dias); where.push(`data_inicio >= (SELECT MAX(data_inicio) FROM radar_novas) - ($${params.length} || ' days')::interval`); }
+  const limit = Math.min(f.limit || 50, 100);
+  const offset = Math.max(f.offset || 0, 0);
+  params.push(limit, offset);
+  const r = await pool.query(
+    `SELECT cnpj, razao_social, nome_fantasia, uf, municipio, cnae_codigo, cnae_descricao, porte,
+            to_char(data_inicio, 'DD/MM/YYYY') AS inicio
+     FROM radar_novas ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+     ORDER BY data_inicio DESC, cnpj LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+  return r.rows;
+}
+
+async function radarInfo() {
+  const r = await pool.query(
+    "SELECT COUNT(*)::int AS total, to_char(MAX(data_inicio),'DD/MM/YYYY') AS ultima FROM radar_novas"
+  );
+  return r.rows[0];
+}
+
+// --- Empresas relacionadas (sócios em comum) ----------------------------------
+// Requer a tabela socios carregada (pós-import). Devolve a matriz de cada básico.
+
+async function relacionadasPorSocios(nomes, basicoAtual, limit = 12) {
+  if (!nomes || !nomes.length) return [];
+  const r = await pool.query(
+    `SELECT DISTINCT s.cnpj_basico, s.nome AS socio
+     FROM socios s WHERE s.nome = ANY($1) AND s.cnpj_basico <> $2 LIMIT $3`,
+    [nomes, basicoAtual, limit]
+  );
+  const out = [];
+  for (const rel of r.rows) {
+    const m = await pool.query(
+      `SELECT cnpj, razao_social, uf, municipio, situacao_cadastral
+       FROM empresas WHERE cnpj >= $1 AND cnpj <= $2 ORDER BY cnpj LIMIT 1`,
+      [rel.cnpj_basico + '000100', rel.cnpj_basico + '000199']
+    );
+    if (m.rows[0]) out.push({ ...m.rows[0], socio: rel.socio });
+  }
+  return out;
 }
 
 /** Retorna { data, enriquecido_em } ou null. */
@@ -442,4 +542,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, close };

@@ -938,3 +938,16 @@ summary:focus-visible, [tabindex]:focus-visible {
   border: 1px solid var(--borda); padding: 8px 10px; font-size: 14px; text-align: left; vertical-align: top; }
 .ie-table thead th { background: #eef4fb; color: var(--azul); font-size: 12px; text-transform: uppercase; letter-spacing: .3px; }
 .details-table th { width: 38%; background: #f7f9fc; color: var(--azul); font-weight: 600; }
+
+/* --- Matriz/filiais, relacionadas, ficha e radar --- */
+.tabela-scroll { overflow-x: auto; }
+.filiais-table th, .filiais-table td { white-space: nowrap; }
+.btn-ficha { display: inline-block; padding: 10px 16px; border-radius: 8px; background: var(--azul); color: #fff; text-decoration: none; font-weight: 600; font-size: 14px; }
+.btn-ficha:hover { opacity: .9; }
+.ficha-cta { margin: 14px 0 4px; }
+.radar-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+.radar-filtros select, .radar-filtros input { padding: 10px; border: 1px solid var(--borda); border-radius: 8px; font-size: 14px; flex: 1 1 150px; }
+.radar-filtros button { padding: 10px 18px; border: none; border-radius: 8px; background: var(--azul); color: #fff; font-weight: 600; cursor: pointer; }
+.radar-table td { font-size: 13.5px; }
+.radar-pag { display: flex; gap: 10px; justify-content: center; margin: 16px 0 4px; }
+.radar-pag .btn { padding: 8px 16px; border-radius: 8px; background: var(--azul); color: #fff; text-decoration: none; font-size: 14px; }
