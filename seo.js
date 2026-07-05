@@ -735,8 +735,12 @@ function renderContato() {
       <li><strong>E-mail / Encarregado (DPO):</strong> <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a></li>
       <li><strong>Site:</strong> <a href="https://www.spartanti.com.br" target="_blank" rel="noopener">www.spartanti.com.br</a></li>
     </ul>
-    <p>Para solicitar a remoção ou correção de dados, exercer seus direitos da LGPD ou tirar dúvidas sobre
-    privacidade, escreva para <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a>.
+    <p>Para solicitar a <strong>exclusão, confirmação de exclusão ou correção de dados</strong> e exercer os
+    demais direitos previstos na LGPD, use o
+    <a href="/lgpd"><strong>formulário de Exclusão de Dados (LGPD)</strong></a> — o pedido gera um
+    <strong>número de protocolo</strong> e pode ser acompanhado na própria página, com resposta em até
+    15 dias. Para dúvidas sobre privacidade, escreva para o Encarregado (DPO):
+    <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a>.
     Veja também nossa <a href="/privacidade">Política de Privacidade</a>.</p>`;
   return contentPage('/contato', 'Contato — SINTEGRA Brasil', 'Entre em contato com o SINTEGRA Brasil (Spartan TI).', 'Contato', inner, 'Contato');
 }
