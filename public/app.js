@@ -255,7 +255,7 @@ form.addEventListener('submit', async (e) => {
   showStatus('loading', 'Consultando...');
 
   try {
-    const resp = await fetch(`/api/consulta?cnpj=${cnpj}`);
+    const resp = await fetch(`/api/consulta?cnpj=${cnpj}`, { cache: 'no-store' });
     const data = await resp.json();
     if (!resp.ok) {
       // 410 = dados removidos a pedido do titular (LGPD): destaca com alerta vermelho

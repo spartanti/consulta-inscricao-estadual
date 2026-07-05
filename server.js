@@ -461,7 +461,8 @@ const CONTENT_TYPES = {
 
 function sendJson(res, status, payload) {
   const body = JSON.stringify(payload);
-  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
+  // APIs são dinâmicas: sem cache (410/404 são cacheáveis por padrão na spec HTTP).
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(body);
 }
 
@@ -810,6 +811,7 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         const st = e.status === 404 || e.status === 410 || e.status === 429 ? e.status : 502;
         if (st === 410) {
+          res.setHeader('Cache-Control', 'no-store');
           return sendHtml(res, 410, `<h1>❗ ${e.message}</h1>
             <p>Estes dados foram removidos a pedido do titular, conforme a Lei nº 13.709/2018 (LGPD).</p>
             <p><a href="/lgpd">Solicitar exclusão ou confirmação de exclusão de dados</a></p>`, isHead);
