@@ -85,12 +85,20 @@ function isValidCnpj(cnpj) {
 // Consulta externa (CNPJ.ws)
 // ---------------------------------------------------------------------------
 
+// Com CNPJWS_TOKEN (plano pago): API comercial, sem o limite global de 3/min.
+// Sem token: API pública (fallback).
+const CNPJWS_TOKEN = (process.env.CNPJWS_TOKEN || '').trim();
+
 function fetchCnpj(cnpj) {
   return new Promise((resolve, reject) => {
-    const url = `https://publica.cnpj.ws/cnpj/${cnpj}`;
+    const url = CNPJWS_TOKEN
+      ? `https://comercial.cnpj.ws/cnpj/${cnpj}`
+      : `https://publica.cnpj.ws/cnpj/${cnpj}`;
+    const headers = { 'User-Agent': 'consulta-ie-es/1.0', Accept: 'application/json' };
+    if (CNPJWS_TOKEN) headers.x_api_token = CNPJWS_TOKEN;
     const req = https.get(
       url,
-      { headers: { 'User-Agent': 'consulta-ie-es/1.0', Accept: 'application/json' } },
+      { headers },
       (res) => {
         let body = '';
         res.on('data', (chunk) => (body += chunk));
