@@ -565,6 +565,27 @@ function sendHtml(res, status, html, isHead) {
   res.end(isHead ? undefined : html);
 }
 
+// Contagem de empresas (badge da home) — estimativa do planner, quase de graça.
+// Atualiza a cada 10 min; a home mostra o tamanho real da base sem custo por visita.
+let totalEmpresas = 20000000;
+async function refreshTotalEmpresas() {
+  try {
+    const n = await db.estimateCount();
+    if (n > 1000000) totalEmpresas = n;
+  } catch (e) { /* mantém último valor */ }
+}
+function fmtEmpresas() {
+  return (totalEmpresas / 1e6).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' mi+';
+}
+
+let homeHtmlCache = null;
+function serveHome(res, isHead) {
+  if (!homeHtmlCache) {
+    homeHtmlCache = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  }
+  return sendHtml(res, 200, homeHtmlCache.replace(/\{\{EMPRESAS\}\}/g, fmtEmpresas()), isHead);
+}
+
 function serveStatic(req, res) {
   let urlPath = decodeURIComponent(req.url.split('?')[0]);
   if (urlPath === '/') urlPath = '/index.html';
@@ -1248,6 +1269,11 @@ const server = http.createServer(async (req, res) => {
       return sendHtml(res, 200, inst[instKey](), isHead);
     }
 
+    // Home com badge dinâmico do tamanho da base
+    if (pathname === '/' || pathname === '/index.html') {
+      return serveHome(res, isHead);
+    }
+
     // Arquivos estaticos
     return serveStatic(req, res);
   }
@@ -1262,6 +1288,8 @@ const server = http.createServer(async (req, res) => {
     console.log('Storage: PostgreSQL conectado.');
     await reloadRemovidos();
     setInterval(reloadRemovidos, 5 * 60 * 1000).unref();
+    await refreshTotalEmpresas();
+    setInterval(refreshTotalEmpresas, 10 * 60 * 1000).unref();
   } catch (e) {
     // App continua no ar: consultas ainda funcionam via API (sem persistir).
     console.error('PostgreSQL indisponível (seguindo sem persistência):', e.message);

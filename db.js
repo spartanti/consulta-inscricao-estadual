@@ -324,6 +324,12 @@ async function apiKeysList(limit = 200) {
   return r.rows;
 }
 
+/** Estimativa instantânea do total de empresas (estatística do planner). */
+async function estimateCount() {
+  const r = await pool.query("SELECT reltuples::bigint AS n FROM pg_class WHERE relname='empresas'");
+  return Number(r.rows[0] ? r.rows[0].n : 0);
+}
+
 // --- Rankings pré-computados ---------------------------------------------------
 
 async function rankingGet(tipo, uf, limit = 100) {
@@ -634,4 +640,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, rankingGet, apiKeyCreate, apiKeyGet, apiUsoFlush, apiUsoHoje, apiUsoSerie, apiKeysList, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, rankingGet, estimateCount, apiKeyCreate, apiKeyGet, apiUsoFlush, apiUsoHoje, apiUsoSerie, apiKeysList, close };
