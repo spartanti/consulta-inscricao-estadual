@@ -224,6 +224,24 @@ function statesNav() {
   return `<nav class="states-nav"><span>Consulta por estado:</span> ${links}</nav>`;
 }
 
+// --- AdSense: side rails (laterais livres em telas largas) ---------------------
+// Preencha os data-ad-slot com os IDs das unidades "Display" (160x600) criadas
+// no painel do AdSense (Anúncios > Por unidade de anúncio). Vazio = não renderiza.
+const ADSENSE_CLIENT = 'ca-pub-1697859368408278';
+const ADSENSE_RAILS = { esq: '', dir: '' };
+
+function adRailsHtml() {
+  const rail = (lado, slot) => `
+  <aside class="ad-rail ${lado} no-print" aria-hidden="true">
+    <ins class="adsbygoogle" data-ad-client="${ADSENSE_CLIENT}" data-ad-slot="${slot}"></ins>
+    <script>(adsbygoogle=window.adsbygoogle||[]).push({});</script>
+  </aside>`;
+  let html = '';
+  if (ADSENSE_RAILS.esq) html += rail('esq', ADSENSE_RAILS.esq);
+  if (ADSENSE_RAILS.dir) html += rail('dir', ADSENSE_RAILS.dir);
+  return html;
+}
+
 /** Layout base de todas as paginas SSR. */
 function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   const bc = breadcrumb
@@ -247,7 +265,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
   <meta property="og:url" content="${escapeHtml(canonical)}" />
   <meta property="og:site_name" content="SINTEGRA Brasil" />
   <meta property="og:image" content="${SITE_URL}/og-image.svg" />
-  <link rel="stylesheet" href="/style.css?v=22" />
+  <link rel="stylesheet" href="/style.css?v=23" />
   ${bc}
   ${gaSnippet()}
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1697859368408278" crossorigin="anonymous"></script>
@@ -263,6 +281,7 @@ function layout({ title, description, canonical, bodyHtml, breadcrumb }) {
       <p class="subtitle">SINTEGRA Brasil · empresas de todo o Brasil</p>
     </div>
   </header>
+  ${adRailsHtml()}
   <main class="container">
     ${bodyHtml}
   </main>
@@ -2111,6 +2130,7 @@ module.exports = {
   renderRanking,
   RANKINGS,
   renderApiPainel,
+  adRailsHtml,
   renderValidador,
   renderWidget,
   renderEmbed,

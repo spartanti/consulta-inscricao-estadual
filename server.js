@@ -583,7 +583,10 @@ function serveHome(res, isHead) {
   if (!homeHtmlCache) {
     homeHtmlCache = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
   }
-  return sendHtml(res, 200, homeHtmlCache.replace(/\{\{EMPRESAS\}\}/g, fmtEmpresas()), isHead);
+  const html = homeHtmlCache
+    .replace(/\{\{EMPRESAS\}\}/g, fmtEmpresas())
+    .replace('{{AD_RAILS}}', seo.adRailsHtml());
+  return sendHtml(res, 200, html, isHead);
 }
 
 function serveStatic(req, res) {
