@@ -118,7 +118,11 @@ function streamZip(file, onLine) {
         const e = getEmp.get(c[0]);
         if (e && e.capital) {
           const v = parseCapital(e.capital);
-          if (v >= 1000000) { // corte: só marcas relevantes entram no top
+          // Filtros de plausibilidade: a fonte tem capitais digitados errado
+          // (cafeterias com R$ 500 bi). Teto absoluto acima da Petrobras (~205 bi)
+          // e micro/pequenas com capital bilionário são descartados do ranking.
+          const suspeito = v > 250e9 || (/Micro|Pequeno/i.test(e.porte || '') && v > 50e6);
+          if (v >= 1000000 && !suspeito) {
             pushCap(uf, { v, cnpj: (c[0] || '') + (c[1] || '') + (c[2] || ''), r: e.razao, p: e.porte, m: muni, u: uf });
           }
         }

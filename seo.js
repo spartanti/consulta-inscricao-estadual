@@ -1260,7 +1260,7 @@ function renderRanking(slug, uf, rows) {
         : '<p class="muted">Ranking em atualização — os dados estão sendo recarregados da Receita Federal. Volte em alguns minutos.</p>'}
       <p><a href="/rankings">← Todos os rankings</a></p>
       <p class="source">Fonte: Dados Abertos da Receita Federal (CNPJ/Simples Nacional). Atualização mensal.
-      Dados com caráter informativo.</p>
+      Dados com caráter informativo.${def.tipo === 'capital' ? ' Valores conforme declarados à Receita; registros com capital implausível (erros de digitação na fonte) são filtrados.' : ''}</p>
     </article>
     ${listLd}
     ${datasetLd(titulo, canonical, def.desc(nomeUf))}`;
