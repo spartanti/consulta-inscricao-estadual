@@ -53,7 +53,8 @@ function streamZip(file, onLine) {
   await pool.query(`CREATE UNLOGGED TABLE IF NOT EXISTS radar_stg (
     cnpj TEXT, razao_social TEXT, nome_fantasia TEXT, uf TEXT, municipio TEXT,
     cnae_codigo TEXT, cnae_descricao TEXT, porte TEXT, data_inicio DATE)`);
-  await pool.query('TRUNCATE radar_novas');
+  // NO_TRUNCATE=1 + START_FILE=N: retomar uma carga interrompida sem zerar
+  if (process.env.NO_TRUNCATE !== '1') await pool.query('TRUNCATE radar_novas');
 
   const muniMap = {}; const cnaeMap = {};
   await streamZip('Municipios.zip', (f) => { muniMap[f[0]] = f[1]; });
@@ -93,7 +94,8 @@ function streamZip(file, onLine) {
     }
   };
 
-  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+  const START_FILE = parseInt(process.env.START_FILE || '0', 10) || 0;
+  for (const k of [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].filter((n) => n >= START_FILE)) {
     const f = `Estabelecimentos${k}.zip`;
     if (!exists(f)) continue;
     await streamZip(f, (c) => {
