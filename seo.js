@@ -586,6 +586,7 @@ SINTEGRA Brasil é um serviço independente e privado (desenvolvido pela Spartan
 - [Radar de empresas novas](${SITE_URL}/radar): empresas abertas recentemente, com filtros por estado, município e CNAE.
 - [Rankings de empresas](${SITE_URL}/rankings): maiores capitais sociais, cidades com mais empresas e MEIs, atividades (CNAE) que mais crescem — Brasil e por estado.
 - [API pública (JSON)](${SITE_URL}/api): consulta de IE e dados cadastrais por CNPJ.
+- [Chave de API gratuita](${SITE_URL}/api/painel): limites maiores (30/min, 2.000/dia) para integradores, ERPs e e-commerces — cadastro self-service.
 
 ## Guias (conteúdo educativo)
 ${GUIDES.map((gd) => `- [${gd.title}](${SITE_URL}/guias/${gd.slug})`).join('\n')}
@@ -1074,6 +1075,90 @@ function renderRadar(rows, f, info, pagina) {
       ],
     },
   });
+}
+
+// --- Painel self-service da API (chaves) ----------------------------------------
+function renderApiPainel() {
+  const inner = `
+    <p>Crie uma <strong>chave de API gratuita</strong> e consulte CNPJ, busca por CNAE e o radar de
+    empresas novas com <strong>limites 10× maiores</strong> que o acesso anônimo — ideal para ERPs,
+    e-commerces e integradores.</p>
+
+    <h2>Planos e limites</h2>
+    <div class="tabela-scroll"><table class="details-table">
+      <thead><tr><th>Acesso</th><th>Por minuto</th><th>Por dia</th><th>Custo</th></tr></thead>
+      <tbody>
+        <tr><td>Anônimo (sem chave)</td><td>3</td><td>—</td><td>Grátis</td></tr>
+        <tr><td><strong>Com chave (free)</strong></td><td><strong>30</strong></td><td><strong>2.000</strong></td><td><strong>Grátis</strong></td></tr>
+        <tr><td>Planos maiores</td><td colspan="3">Em breve — fale com <a href="mailto:admin@spartanti.com.br">admin@spartanti.com.br</a></td></tr>
+      </tbody>
+    </table></div>
+
+    <h2>Criar chave gratuita</h2>
+    <form id="ak-form" class="card" style="padding:20px;display:grid;gap:12px;max-width:560px">
+      <label>Seu nome ou empresa*<br>
+        <input name="nome" type="text" required maxlength="120" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <label>E-mail*<br>
+        <input name="email" type="email" required maxlength="160" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <input name="site" type="text" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+      <button type="submit" style="padding:12px 18px;border:none;border-radius:8px;background:var(--azul,#0b4f9e);color:#fff;font-weight:600;cursor:pointer">Gerar minha chave</button>
+      <p id="ak-msg" role="status" style="margin:0;font-size:14px;word-break:break-all"></p>
+    </form>
+
+    <h2>Como usar</h2>
+    <pre style="background:#0e2a47;color:#dce8f5;padding:14px;border-radius:10px;overflow-x:auto;font-size:13px">curl -H "X-Api-Key: SUA_CHAVE" \\
+  "https://www.sintegrabrasil.com.br/api/v1/cnpj/00000000000191"
+
+# ou via parâmetro:
+curl "https://www.sintegrabrasil.com.br/api/v1/radar?uf=SP&api_key=SUA_CHAVE"</pre>
+    <p>Funciona em todas as rotas <code>/api/v1/*</code>: <a href="/api">documentação completa</a>.</p>
+
+    <h2>Consultar uso da minha chave</h2>
+    <form id="ak-uso" class="card" style="padding:20px;display:grid;gap:12px;max-width:560px">
+      <label>Chave (sk_...)<br>
+        <input name="chave" type="text" required style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc;font-family:monospace"></label>
+      <button type="submit" style="padding:12px 18px;border:none;border-radius:8px;background:var(--azul,#0b4f9e);color:#fff;font-weight:600;cursor:pointer">Ver uso</button>
+      <div id="ak-uso-out" style="font-size:14px"></div>
+    </form>
+
+    <script>
+    (function () {
+      var f = document.getElementById('ak-form'); var msg = document.getElementById('ak-msg');
+      f.addEventListener('submit', function (e) {
+        e.preventDefault(); msg.textContent = 'Gerando…';
+        fetch('/api/keys', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(f).entries())) })
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            if (!x.ok) { msg.innerHTML = '❗ ' + (x.j.erro || 'Não foi possível criar.'); return; }
+            f.reset();
+            msg.innerHTML = '✅ Sua chave (guarde agora, exibida só uma vez):<br><code style="font-size:15px"><strong>' +
+              x.j.chave + '</strong></code><br>' + x.j.aviso;
+          })
+          .catch(function () { msg.textContent = '❗ Erro de conexão.'; });
+      });
+      var u = document.getElementById('ak-uso'); var out = document.getElementById('ak-uso-out');
+      u.addEventListener('submit', function (e) {
+        e.preventDefault(); out.textContent = 'Consultando…';
+        var chave = new FormData(u).get('chave').trim();
+        fetch('/api/keys/uso?chave=' + encodeURIComponent(chave))
+          .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+          .then(function (x) {
+            if (!x.ok) { out.innerHTML = '❗ ' + (x.j.erro || 'Erro.'); return; }
+            var s = x.j;
+            var hist = (s.ultimos_14_dias || []).map(function (d) { return d.dia + ': ' + d.n; }).join(' · ') || 'sem uso';
+            out.innerHTML = '<strong>Plano:</strong> ' + s.plano + (s.ativa ? ' (ativa)' : ' (DESATIVADA)') +
+              '<br><strong>Limites:</strong> ' + s.limites.por_minuto + '/min · ' + s.limites.por_dia + '/dia' +
+              '<br><strong>Uso hoje:</strong> ' + s.uso_hoje +
+              '<br><strong>Últimos 14 dias:</strong> ' + hist;
+          })
+          .catch(function () { out.textContent = '❗ Erro de conexão.'; });
+      });
+    })();
+    </script>`;
+  return contentPage('/api/painel', 'Chave de API gratuita — painel do desenvolvedor — SINTEGRA Brasil',
+    'Crie uma chave de API gratuita para consultar CNPJ, CNAE e empresas novas com limites maiores (30/min, 2.000/dia). Painel self-service com consulta de uso.',
+    'Painel da API — chave gratuita', inner, 'API · Painel');
 }
 
 // --- Rankings e estatísticas programáticas -------------------------------------
@@ -1961,9 +2046,11 @@ function renderApiDocs() {
 
     <h2>Características</h2>
     <ul>
-      <li><strong>Autenticação:</strong> não é necessária (uso gratuito).</li>
+      <li><strong>Autenticação:</strong> opcional. Sem chave: 3 req/min por IP. Com
+      <a href="/api/painel"><strong>chave gratuita</strong></a>: <strong>30 req/min e 2.000/dia</strong>
+      (header <code>X-Api-Key</code> ou parâmetro <code>?api_key=</code>).</li>
       <li><strong>CORS:</strong> habilitado (<code>Access-Control-Allow-Origin: *</code>) — pode chamar do navegador.</li>
-      <li><strong>Limite de uso:</strong> até 30 requisições por minuto por IP. Consultas já feitas são servidas de cache (mais rápido); CNPJs novos dependem da fonte de dados.</li>
+      <li><strong>Cache:</strong> consultas já feitas são servidas de cache (mais rápido); CNPJs novos dependem da fonte de dados.</li>
       <li><strong>Privacidade:</strong> a API pública <strong>não</strong> retorna o quadro de sócios (QSA).</li>
     </ul>
 
@@ -2023,6 +2110,7 @@ module.exports = {
   renderRankingsIndex,
   renderRanking,
   RANKINGS,
+  renderApiPainel,
   renderValidador,
   renderWidget,
   renderEmbed,

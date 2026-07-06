@@ -456,6 +456,72 @@ function rateLimitOk(ip) {
   return true;
 }
 
+// --- Chaves de API: cache, limites por chave e contagem de uso -----------------
+const akCache = new Map();        // key -> { row, ts } (TTL 2 min)
+const akMinHits = new Map();      // key -> [timestamps] (janela de 60s)
+const akDia = new Map();          // key -> { dia, n } (limite diário, aproximado)
+const akUsoBuffer = new Map();    // key -> n (flush p/ api_uso a cada 30s)
+
+async function apiKeyRow(key) {
+  const hit = akCache.get(key);
+  if (hit && Date.now() - hit.ts < 120000) return hit.row;
+  let row = null;
+  try { row = await db.apiKeyGet(key); } catch (e) { return hit ? hit.row : null; }
+  akCache.set(key, { row, ts: Date.now() });
+  if (akCache.size > 2000) akCache.clear();
+  return row;
+}
+
+/**
+ * Portão das rotas /api/v1: com chave válida usa os limites da chave;
+ * sem chave, o limite anônimo por IP. Responde 401/429 e retorna false se barrado.
+ */
+async function apiGate(req, res, urlObj) {
+  const key = String(req.headers['x-api-key'] || urlObj.searchParams.get('api_key') || '').trim();
+  if (!key) {
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      sendJson(res, 429, { erro: 'Limite anônimo excedido (3/min). Crie uma chave gratuita em https://www.sintegrabrasil.com.br/api/painel para limites maiores.' });
+      return false;
+    }
+    return true;
+  }
+  const row = await apiKeyRow(key);
+  if (!row || !row.ativa) {
+    sendJson(res, 401, { erro: 'Chave de API inválida ou desativada. Crie a sua em https://www.sintegrabrasil.com.br/api/painel.' });
+    return false;
+  }
+  const now = Date.now();
+  const arr = (akMinHits.get(key) || []).filter((t) => now - t < 60000);
+  if (arr.length >= row.limite_min) {
+    akMinHits.set(key, arr);
+    res.setHeader('Retry-After', '60');
+    sendJson(res, 429, { erro: `Limite por minuto da chave atingido (${row.limite_min}/min).` });
+    return false;
+  }
+  const hoje = new Date().toISOString().slice(0, 10);
+  let d = akDia.get(key);
+  if (!d || d.dia !== hoje) { d = { dia: hoje, n: 0 }; akDia.set(key, d); }
+  if (d.n >= row.limite_dia) {
+    sendJson(res, 429, { erro: `Limite diário da chave atingido (${row.limite_dia}/dia).` });
+    return false;
+  }
+  arr.push(now); akMinHits.set(key, arr); d.n++;
+  akUsoBuffer.set(key, (akUsoBuffer.get(key) || 0) + 1);
+  res.setHeader('X-RateLimit-Limit', String(row.limite_min));
+  res.setHeader('X-RateLimit-Remaining', String(Math.max(row.limite_min - arr.length, 0)));
+  return true;
+}
+
+async function flushApiUso() {
+  if (!akUsoBuffer.size) return;
+  const batch = new Map(akUsoBuffer); akUsoBuffer.clear();
+  try { await db.apiUsoFlush(batch); } catch (e) {
+    for (const [k, n] of batch) akUsoBuffer.set(k, (akUsoBuffer.get(k) || 0) + n);
+  }
+}
+setInterval(flushApiUso, 30000).unref();
+
 /** Remove dados pessoais (QSA) da resposta pública da API. */
 function publicView(data) {
   const out = Object.assign({}, data);
@@ -564,10 +630,7 @@ const server = http.createServer(async (req, res) => {
     setCors(res);
     const cnpj = onlyDigits(apiM[1]);
     if (!isValidCnpj(cnpj)) return sendJson(res, 400, { erro: 'CNPJ inválido. Informe 14 dígitos válidos.' });
-    if (!rateLimitOk(clientIp(req))) {
-      res.setHeader('Retry-After', '60');
-      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
-    }
+    if (!(await apiGate(req, res, urlObj))) return;
     try {
       const data = await getCnpjData(cnpj);
       counterInc();
@@ -583,10 +646,7 @@ const server = http.createServer(async (req, res) => {
   // API PÚBLICA: radar de empresas novas
   if (req.method === 'GET' && pathname === '/api/v1/radar') {
     setCors(res);
-    if (!rateLimitOk(clientIp(req))) {
-      res.setHeader('Retry-After', '60');
-      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
-    }
+    if (!(await apiGate(req, res, urlObj))) return;
     const f = {
       uf: (urlObj.searchParams.get('uf') || '').trim().toUpperCase().slice(0, 2),
       municipio: (urlObj.searchParams.get('municipio') || '').trim().slice(0, 60),
@@ -616,10 +676,7 @@ const server = http.createServer(async (req, res) => {
     if (!f.cnae && !f.uf && !f.municipio && !f.q) {
       return sendJson(res, 400, { erro: 'Informe ao menos um filtro (cnae, uf, municipio ou q).' });
     }
-    if (!rateLimitOk(clientIp(req))) {
-      res.setHeader('Retry-After', '60');
-      return sendJson(res, 429, { erro: 'Limite de requisições excedido. Tente novamente em instantes.' });
-    }
+    if (!(await apiGate(req, res, urlObj))) return;
     const limit = Math.min(parseInt(urlObj.searchParams.get('limit') || '50', 10) || 50, 100);
     const offset = Math.max(parseInt(urlObj.searchParams.get('offset') || '0', 10) || 0, 0);
     try {
@@ -766,6 +823,70 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API keys: criar chave (self-service)
+  if (req.method === 'POST' && pathname === '/api/keys') {
+    if (!rateLimitOk(clientIp(req))) {
+      res.setHeader('Retry-After', '60');
+      return sendJson(res, 429, { erro: 'Muitas solicitações. Tente novamente em instantes.' });
+    }
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+    req.on('end', async () => {
+      try {
+        const b = JSON.parse(body || '{}');
+        if (b.site) return sendJson(res, 400, { erro: 'Solicitação inválida.' }); // honeypot
+        const nome = String(b.nome || '').trim().slice(0, 120);
+        const email = String(b.email || '').trim().toLowerCase().slice(0, 160);
+        if (nome.length < 2) return sendJson(res, 400, { erro: 'Informe seu nome ou o da empresa.' });
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { erro: 'Informe um e-mail válido.' });
+        const key = 'sk_' + crypto.randomBytes(24).toString('hex');
+        try {
+          await db.apiKeyCreate({ key, email, nome });
+        } catch (e) {
+          if (e && e.code === '23505') {
+            return sendJson(res, 409, { erro: 'Já existe uma chave para este e-mail. Se você a perdeu, escreva para admin@spartanti.com.br.' });
+          }
+          throw e;
+        }
+        bump('api_key_criada');
+        return sendJson(res, 201, {
+          chave: key,
+          plano: 'free',
+          limites: { por_minuto: 30, por_dia: 2000 },
+          aviso: 'Guarde esta chave: ela é exibida apenas uma vez. Use no header X-Api-Key ou no parâmetro ?api_key=.',
+        });
+      } catch (e) {
+        return sendJson(res, 500, { erro: 'Não foi possível criar a chave. Tente novamente.' });
+      }
+    });
+    return;
+  }
+
+  // API keys: uso da própria chave (a chave é a credencial) + listagem admin
+  if (req.method === 'GET' && pathname === '/api/keys/uso') {
+    const k = urlObj.searchParams.get('k');
+    if (k && process.env.STATS_KEY && k === process.env.STATS_KEY) {
+      try { return sendJson(res, 200, { chaves: await db.apiKeysList(200) }); }
+      catch (e) { return sendJson(res, 500, { erro: 'Erro ao listar.' }); }
+    }
+    const chave = String(urlObj.searchParams.get('chave') || '').trim();
+    if (!/^sk_[0-9a-f]{48}$/.test(chave)) return sendJson(res, 400, { erro: 'Chave inválida.' });
+    try {
+      await flushApiUso();
+      const row = await db.apiKeyGet(chave);
+      if (!row) return sendJson(res, 404, { erro: 'Chave não encontrada.' });
+      const [hoje, serie] = await Promise.all([db.apiUsoHoje(chave), db.apiUsoSerie(chave, 14)]);
+      return sendJson(res, 200, {
+        plano: row.plano, ativa: row.ativa,
+        limites: { por_minuto: row.limite_min, por_dia: row.limite_dia },
+        uso_hoje: hoje, ultimos_14_dias: serie,
+        criada_em: row.criada_em, ultimo_uso: row.ultimo_uso,
+      });
+    } catch (e) {
+      return sendJson(res, 500, { erro: 'Erro ao consultar o uso.' });
+    }
+  }
+
   // LGPD admin: ações do painel (concluir/negar/excluir/reativar) — exige senha
   if (req.method === 'POST' && pathname === '/api/lgpd-admin') {
     let body = '';
@@ -871,6 +992,7 @@ const server = http.createServer(async (req, res) => {
         { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/radar`, priority: '0.8' },
         { loc: `${seo.SITE_URL}/rankings`, priority: '0.7' },
+        { loc: `${seo.SITE_URL}/api/painel`, priority: '0.6' },
         ...Object.keys(seo.RANKINGS).flatMap((slug) => [
           { loc: `${seo.SITE_URL}/rankings/${slug}`, priority: '0.6' },
           ...seo.UFS.map((uf) => ({ loc: `${seo.SITE_URL}/rankings/${slug}/${uf.toLowerCase()}`, priority: '0.5' })),
@@ -1056,6 +1178,12 @@ const server = http.createServer(async (req, res) => {
     // Documentação da API pública
     if (pathname === '/api' || pathname === '/api/' || pathname === '/api/docs') {
       return sendHtml(res, 200, seo.renderApiDocs(), isHead);
+    }
+
+    // Painel self-service de chaves da API
+    if (pathname === '/api/painel' || pathname === '/api/painel/') {
+      bump('api_painel');
+      return sendHtml(res, 200, seo.renderApiPainel(), isHead);
     }
 
     // Widget e incorporação

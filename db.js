@@ -110,6 +110,28 @@ async function init(connStr) {
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_radar_inicio ON radar_novas(data_inicio DESC);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_radar_uf ON radar_novas(uf);');
+  // Chaves de API (self-service) + uso diário por chave.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS api_keys (
+      key        TEXT PRIMARY KEY,
+      email      TEXT NOT NULL UNIQUE,
+      nome       TEXT,
+      plano      TEXT NOT NULL DEFAULT 'free',
+      limite_min INT  NOT NULL DEFAULT 30,
+      limite_dia INT  NOT NULL DEFAULT 2000,
+      ativa      BOOLEAN NOT NULL DEFAULT true,
+      criada_em  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      ultimo_uso TIMESTAMPTZ
+    );
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS api_uso (
+      key TEXT NOT NULL,
+      dia DATE NOT NULL,
+      n   BIGINT NOT NULL DEFAULT 0,
+      PRIMARY KEY (key, dia)
+    );
+  `);
   // Rankings pré-computados (rankings-build.js) — páginas /rankings.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rankings (
@@ -250,6 +272,56 @@ async function radarInfo() {
     "SELECT COUNT(*)::int AS total, to_char(MAX(data_inicio),'DD/MM/YYYY') AS ultima FROM radar_novas"
   );
   return r.rows[0];
+}
+
+// --- Chaves de API ---------------------------------------------------------------
+
+async function apiKeyCreate(rec) {
+  await pool.query(
+    'INSERT INTO api_keys (key, email, nome) VALUES ($1,$2,$3)',
+    [rec.key, rec.email, rec.nome || null]
+  );
+}
+
+async function apiKeyGet(key) {
+  const r = await pool.query('SELECT * FROM api_keys WHERE key=$1', [key]);
+  return r.rows[0] || null;
+}
+
+/** Soma os usos acumulados no dia (buffer do servidor) e marca último uso. */
+async function apiUsoFlush(porChave) {
+  for (const [key, n] of porChave) {
+    if (!n) continue;
+    await pool.query(
+      `INSERT INTO api_uso (key, dia, n) VALUES ($1, CURRENT_DATE, $2)
+       ON CONFLICT (key, dia) DO UPDATE SET n = api_uso.n + EXCLUDED.n`,
+      [key, n]
+    );
+    await pool.query('UPDATE api_keys SET ultimo_uso=now() WHERE key=$1', [key]);
+  }
+}
+
+async function apiUsoHoje(key) {
+  const r = await pool.query('SELECT n::int FROM api_uso WHERE key=$1 AND dia=CURRENT_DATE', [key]);
+  return r.rows[0] ? r.rows[0].n : 0;
+}
+
+async function apiUsoSerie(key, dias = 14) {
+  const r = await pool.query(
+    `SELECT to_char(dia,'DD/MM') AS dia, n::int FROM api_uso
+     WHERE key=$1 AND dia >= CURRENT_DATE - $2::int ORDER BY dia`,
+    [key, dias]
+  );
+  return r.rows;
+}
+
+async function apiKeysList(limit = 200) {
+  const r = await pool.query(
+    `SELECT k.key, k.email, k.nome, k.plano, k.ativa, k.criada_em, k.ultimo_uso,
+            COALESCE((SELECT SUM(n) FROM api_uso u WHERE u.key=k.key), 0)::int AS total
+     FROM api_keys k ORDER BY k.criada_em DESC LIMIT $1`, [limit]
+  );
+  return r.rows;
 }
 
 // --- Rankings pré-computados ---------------------------------------------------
@@ -562,4 +634,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, rankingGet, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, rankingGet, apiKeyCreate, apiKeyGet, apiUsoFlush, apiUsoHoje, apiUsoSerie, apiKeysList, close };
