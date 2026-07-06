@@ -110,6 +110,14 @@ async function init(connStr) {
   `);
   await pool.query('CREATE INDEX IF NOT EXISTS idx_radar_inicio ON radar_novas(data_inicio DESC);');
   await pool.query('CREATE INDEX IF NOT EXISTS idx_radar_uf ON radar_novas(uf);');
+  // Rankings pré-computados (rankings-build.js) — páginas /rankings.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS rankings (
+      tipo TEXT NOT NULL, uf TEXT NOT NULL, pos INT NOT NULL,
+      chave TEXT, rotulo TEXT, valor NUMERIC, valor2 NUMERIC, extra JSONB,
+      PRIMARY KEY (tipo, uf, pos)
+    );
+  `);
   // Sócios (QSA) para "empresas relacionadas" — carregada após o import nacional.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS socios (
@@ -242,6 +250,16 @@ async function radarInfo() {
     "SELECT COUNT(*)::int AS total, to_char(MAX(data_inicio),'DD/MM/YYYY') AS ultima FROM radar_novas"
   );
   return r.rows[0];
+}
+
+// --- Rankings pré-computados ---------------------------------------------------
+
+async function rankingGet(tipo, uf, limit = 100) {
+  const r = await pool.query(
+    'SELECT pos, chave, rotulo, valor::float8 AS valor, valor2::float8 AS valor2, extra FROM rankings WHERE tipo=$1 AND uf=$2 ORDER BY pos LIMIT $3',
+    [tipo, uf, limit]
+  );
+  return r.rows;
 }
 
 // --- Empresas relacionadas (sócios em comum) ----------------------------------
@@ -544,4 +562,4 @@ async function close() {
   if (pool) await pool.end();
 }
 
-module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, close };
+module.exports = { init, getRow, getCnpj, saveEnriched, upsertBase, upsertBaseBatch, listRecent, count, listCnpjsChunk, search, statsByUf, statsByMunicipio, bumpMetric, getMetrics, getMetricsDaily, saveVisitorsBatch, getGeoStats, lgpdCreate, lgpdGet, lgpdList, lgpdSetStatus, removedList, removedAdd, removedDel, removeEmpresa, listFiliais, countFiliais, radarList, radarInfo, relacionadasPorSocios, rankingGet, close };

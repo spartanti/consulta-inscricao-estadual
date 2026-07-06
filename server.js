@@ -870,6 +870,11 @@ const server = http.createServer(async (req, res) => {
         { loc: `${seo.SITE_URL}/sobre-os-dados`, priority: '0.5' },
         { loc: `${seo.SITE_URL}/contato`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/radar`, priority: '0.8' },
+        { loc: `${seo.SITE_URL}/rankings`, priority: '0.7' },
+        ...Object.keys(seo.RANKINGS).flatMap((slug) => [
+          { loc: `${seo.SITE_URL}/rankings/${slug}`, priority: '0.6' },
+          ...seo.UFS.map((uf) => ({ loc: `${seo.SITE_URL}/rankings/${slug}/${uf.toLowerCase()}`, priority: '0.5' })),
+        ]),
         { loc: `${seo.SITE_URL}/privacidade`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/termos`, priority: '0.3' },
         { loc: `${seo.SITE_URL}/lgpd`, priority: '0.3' },
@@ -917,6 +922,22 @@ const server = http.createServer(async (req, res) => {
         const st = e.status === 404 || e.status === 410 || e.status === 429 ? e.status : 502;
         return sendHtml(res, st, `<h1>${e.message || 'Erro na consulta'}</h1>`, isHead);
       }
+    }
+
+    // Rankings e estatísticas programáticas
+    if (pathname === '/rankings' || pathname === '/rankings/') {
+      bump('rankings');
+      return sendHtml(res, 200, seo.renderRankingsIndex(), isHead);
+    }
+    m = pathname.match(/^\/rankings\/([a-z-]+)(?:\/([a-z]{2}))?\/?$/);
+    if (m && seo.RANKINGS[m[1]]) {
+      const slug = m[1];
+      const uf = m[2] ? m[2].toUpperCase() : 'BR';
+      if (uf !== 'BR' && !seo.UF_INFO[uf]) return sendHtml(res, 404, '<h1>Estado não encontrado</h1>', isHead);
+      bump('rankings');
+      let rows = [];
+      try { rows = await db.rankingGet(seo.RANKINGS[slug].tipo, uf, 100); } catch (e) {}
+      return sendHtml(res, 200, seo.renderRanking(slug, uf, rows), isHead);
     }
 
     // Radar de empresas novas

@@ -583,6 +583,8 @@ SINTEGRA Brasil é um serviço independente e privado (desenvolvido pela Spartan
 - [Agente de certificado digital](${SITE_URL}/agente): programa local (Windows/Linux/macOS) que baixa a NF-e na SEFAZ com o certificado A1 sem enviar a chave privada a servidores.
 - [Busca de empresas por CNAE, estado e município](${SITE_URL}/busca): com mapa de calor por região.
 - [Validador de Inscrição Estadual](${SITE_URL}/validar-inscricao-estadual): valida a IE nos 27 estados.
+- [Radar de empresas novas](${SITE_URL}/radar): empresas abertas recentemente, com filtros por estado, município e CNAE.
+- [Rankings de empresas](${SITE_URL}/rankings): maiores capitais sociais, cidades com mais empresas e MEIs, atividades (CNAE) que mais crescem — Brasil e por estado.
 - [API pública (JSON)](${SITE_URL}/api): consulta de IE e dados cadastrais por CNPJ.
 
 ## Guias (conteúdo educativo)
@@ -1069,6 +1071,126 @@ function renderRadar(rows, f, info, pagina) {
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE_URL}/` },
         { '@type': 'ListItem', position: 2, name: 'Radar de empresas novas', item: canonical },
+      ],
+    },
+  });
+}
+
+// --- Rankings e estatísticas programáticas -------------------------------------
+const RANKINGS = {
+  'capital-social': {
+    tipo: 'capital', emoji: '💰',
+    titulo: (n) => `As empresas com maior capital social ${n ? `de ${n}` : 'do Brasil'}`,
+    desc: (n) => `Ranking das empresas com maior capital social registrado ${n ? `no estado de ${n}` : 'no Brasil'}, segundo os dados públicos da Receita Federal (CNPJ). Lista com razão social, porte, município e capital.`,
+  },
+  'cidades-com-mais-empresas': {
+    tipo: 'cidades', emoji: '🏙️',
+    titulo: (n) => `Cidades ${n ? `de ${n}` : 'do Brasil'} com mais empresas ativas`,
+    desc: (n) => `Ranking das cidades ${n ? `de ${n}` : 'do Brasil'} com mais empresas ativas (CNPJ), segundo a Receita Federal.`,
+  },
+  'cidades-com-mais-meis': {
+    tipo: 'mei', emoji: '🧑‍💼',
+    titulo: (n) => `Cidades ${n ? `de ${n}` : 'do Brasil'} com mais MEIs`,
+    desc: (n) => `Ranking das cidades ${n ? `de ${n}` : 'do Brasil'} com mais microempreendedores individuais (MEI) ativos, com base no Simples Nacional (Receita Federal).`,
+  },
+  'atividades-em-crescimento': {
+    tipo: 'cnaes', emoji: '📈',
+    titulo: (n) => `Atividades (CNAE) que mais crescem ${n ? `em ${n}` : 'no Brasil'}`,
+    desc: (n) => `Atividades econômicas (CNAE) com mais aberturas de empresas nos últimos 90 dias ${n ? `em ${n}` : 'no Brasil'}, comparadas com o trimestre anterior. Dados da Receita Federal.`,
+  },
+};
+
+function rankingUfNav(slug, ufAtual) {
+  const links = ['BR', ...UFS].map((u) => (u === ufAtual
+    ? `<strong>${u}</strong>`
+    : `<a href="/rankings/${slug}${u === 'BR' ? '' : '/' + u.toLowerCase()}">${u}</a>`)).join(' ');
+  return `<nav class="states-nav"><span>Ver por estado:</span> ${links}</nav>`;
+}
+
+function renderRankingsIndex() {
+  const cards = Object.entries(RANKINGS).map(([slug, r]) => `
+    <li>${r.emoji} <a href="/rankings/${slug}"><strong>${escapeHtml(r.titulo(null))}</strong></a><br>
+    <small class="muted">${escapeHtml(r.desc(null))}</small></li>`).join('');
+  const inner = `
+    <p>Rankings gerados da base de dados públicos da Receita Federal (CNPJ), atualizados a cada carga mensal.
+    Todos disponíveis para o Brasil e por estado.</p>
+    <ul class="usecases-list">${cards}</ul>`;
+  return contentPage('/rankings', 'Rankings de empresas do Brasil — capital social, cidades e CNAEs em crescimento',
+    'Rankings e estatísticas de empresas brasileiras: maiores capitais sociais, cidades com mais empresas e MEIs, atividades (CNAE) que mais crescem. Dados públicos da Receita Federal.',
+    'Rankings e estatísticas de empresas', inner, 'Rankings');
+}
+
+function renderRanking(slug, uf, rows) {
+  const def = RANKINGS[slug];
+  const nomeUf = uf === 'BR' ? null : UF_INFO[uf];
+  const canonical = `${SITE_URL}/rankings/${slug}${uf === 'BR' ? '' : '/' + uf.toLowerCase()}`;
+  const titulo = def.titulo(nomeUf);
+  const fmtInt = (n) => Number(n).toLocaleString('pt-BR');
+  const fmtBRL = (n) => 'R$ ' + Number(n).toLocaleString('pt-BR', { maximumFractionDigits: 0 });
+
+  let head = ''; let linhas = ''; let itemList = [];
+  if (def.tipo === 'capital') {
+    head = '<tr><th>#</th><th>Empresa</th><th>Capital social</th><th>Porte</th><th>Município/UF</th></tr>';
+    linhas = rows.map((r) => {
+      const ex = r.extra || {};
+      itemList.push({ name: r.rotulo, url: `${SITE_URL}/cnpj/${r.chave}` });
+      return `<tr><td>${r.pos}</td>
+        <td><a href="/cnpj/${r.chave}">${escapeHtml(r.rotulo || r.chave)}</a></td>
+        <td>${fmtBRL(r.valor)}</td><td>${escapeHtml(ex.porte || '—')}</td>
+        <td>${escapeHtml([ex.municipio, ex.uf].filter(Boolean).join(' / ') || '—')}</td></tr>`;
+    }).join('');
+  } else if (def.tipo === 'cnaes') {
+    head = '<tr><th>#</th><th>Atividade (CNAE)</th><th>Aberturas (90 dias)</th><th>Variação vs trimestre anterior</th></tr>';
+    linhas = rows.map((r) => {
+      const prev = Number(r.valor2) || 0;
+      const varTxt = prev > 0 ? `${(((r.valor - prev) / prev) * 100).toFixed(0)}%` : 'novo';
+      itemList.push({ name: `${r.rotulo} — ${fmtInt(r.valor)} aberturas` });
+      return `<tr><td>${r.pos}</td>
+        <td><a href="/busca?cnae=${encodeURIComponent(r.chave)}${uf === 'BR' ? '' : '&uf=' + uf}">${escapeHtml(r.rotulo)}</a>
+          <br><small class="muted">CNAE ${escapeHtml(r.chave)}</small></td>
+        <td>${fmtInt(r.valor)}</td><td>${prev > 0 && r.valor >= prev ? '▲ +' : (prev > 0 ? '▼ ' : '')}${varTxt}</td></tr>`;
+    }).join('');
+  } else {
+    const rot = def.tipo === 'mei' ? 'MEIs ativos' : 'Empresas ativas';
+    head = `<tr><th>#</th><th>Cidade</th><th>${rot}</th></tr>`;
+    linhas = rows.map((r) => {
+      itemList.push({ name: `${r.rotulo} — ${fmtInt(r.valor)} ${rot.toLowerCase()}` });
+      return `<tr><td>${r.pos}</td><td>${escapeHtml(r.rotulo)}</td><td>${fmtInt(r.valor)}</td></tr>`;
+    }).join('');
+  }
+
+  const listLd = jsonLd({
+    '@context': 'https://schema.org', '@type': 'ItemList', name: titulo, url: canonical,
+    numberOfItems: rows.length,
+    itemListElement: itemList.slice(0, 25).map((it, i) => ({ '@type': 'ListItem', position: i + 1, name: it.name, ...(it.url ? { url: it.url } : {}) })),
+  });
+
+  const bodyHtml = `
+    <article class="card">
+      <h1>${def.emoji} ${escapeHtml(titulo)}</h1>
+      <p>${escapeHtml(def.desc(nomeUf))}</p>
+      ${rankingUfNav(slug, uf)}
+      ${rows.length ? `<div class="tabela-scroll"><table class="details-table radar-table">
+        <thead>${head}</thead><tbody>${linhas}</tbody></table></div>`
+        : '<p class="muted">Ranking em atualização — os dados estão sendo recarregados da Receita Federal. Volte em alguns minutos.</p>'}
+      <p><a href="/rankings">← Todos os rankings</a></p>
+      <p class="source">Fonte: Dados Abertos da Receita Federal (CNPJ/Simples Nacional). Atualização mensal.
+      Dados com caráter informativo.</p>
+    </article>
+    ${listLd}
+    ${datasetLd(titulo, canonical, def.desc(nomeUf))}`;
+
+  return layout({
+    title: `${titulo} — SINTEGRA Brasil`,
+    description: def.desc(nomeUf),
+    canonical,
+    bodyHtml,
+    breadcrumb: {
+      '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'Início', item: `${SITE_URL}/` },
+        { '@type': 'ListItem', position: 2, name: 'Rankings', item: `${SITE_URL}/rankings` },
+        { '@type': 'ListItem', position: 3, name: titulo, item: canonical },
       ],
     },
   });
@@ -1898,6 +2020,9 @@ module.exports = {
   renderLgpdAdminLogin,
   renderRadar,
   renderFicha,
+  renderRankingsIndex,
+  renderRanking,
+  RANKINGS,
   renderValidador,
   renderWidget,
   renderEmbed,
