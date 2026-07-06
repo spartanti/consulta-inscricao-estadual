@@ -813,8 +813,10 @@ function renderPrivacidade() {
       (QSA) em páginas indexáveis.</li>
       <li><strong>Dados de navegação:</strong> de forma agregada e anonimizada, via Google Analytics
       (somente com o seu consentimento), para medir audiência.</li>
-      <li><strong>CNPJ digitado:</strong> usado para realizar a consulta. Não exigimos cadastro nem coletamos
-      seu nome, e-mail ou CPF.</li>
+      <li><strong>CNPJ digitado:</strong> usado para realizar a consulta. Não exigimos cadastro para consultar.</li>
+      <li><strong>Solicitações LGPD:</strong> no <a href="/lgpd">formulário de Exclusão de Dados</a> coletamos
+      nome, CPF, e-mail e telefone do solicitante — <strong>exclusivamente</strong> para confirmar a identidade
+      do titular e responder ao pedido (art. 6º, III — minimização). Esses dados não são publicados.</li>
     </ul>
     <p>Não tratamos dados pessoais sensíveis e não realizamos decisões automatizadas que afetem titulares.</p>
 
@@ -914,8 +916,14 @@ function renderLgpd() {
       <label>Seu nome completo*<br>
         <input name="nome" type="text" required maxlength="120"
           style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <label>CPF do solicitante*<br>
+        <input name="cpf" type="text" required inputmode="numeric" maxlength="14" placeholder="000.000.000-00"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
       <label>E-mail para retorno*<br>
         <input name="email" type="email" required maxlength="160"
+          style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
+      <label>Telefone de contato*<br>
+        <input name="telefone" type="tel" required inputmode="numeric" maxlength="20" placeholder="(00) 00000-0000"
           style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></label>
       <label>Sua relação com os dados*<br>
         <select name="relacao" required style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc">
@@ -929,6 +937,9 @@ function renderLgpd() {
           placeholder="Ex.: solicito a exclusão do meu nome do quadro societário exibido na página do CNPJ acima."
           style="width:100%;padding:10px;border-radius:8px;border:1px solid #ccc"></textarea></label>
       <input name="site" type="text" tabindex="-1" autocomplete="off" style="display:none" aria-hidden="true">
+      <p class="muted" style="margin:0;font-size:13px">Seu CPF e telefone são usados <strong>apenas</strong> para
+      confirmar sua identidade e responder a esta solicitação (princípio da minimização — art. 6º, III, da LGPD).
+      Não são publicados nem usados para outra finalidade.</p>
       <button type="submit" style="padding:12px 18px;border:none;border-radius:8px;background:var(--azul,#0b4f9e);color:#fff;font-weight:600;cursor:pointer">Enviar solicitação</button>
       <p id="lgpd-msg" class="muted" role="status"></p>
     </form>
@@ -1178,7 +1189,9 @@ function renderLgpdAdmin(sols, removidos, key) {
       <td><code>${esc(s.protocolo)}</code><br><small>${dt(s.criada_em)}</small></td>
       <td>${esc(s.tipo)}</td>
       <td>${fmtCnpj(s.cnpj)}</td>
-      <td>${esc(s.nome)}<br><small><a href="mailto:${esc(s.email)}">${esc(s.email)}</a> · ${esc(s.relacao || '—')}</small></td>
+      <td>${esc(s.nome)}<br><small><a href="mailto:${esc(s.email)}">${esc(s.email)}</a> · ${esc(s.relacao || '—')}</small>
+        ${s.cpf ? `<br><small>CPF: ${esc(String(s.cpf).replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4'))}</small>` : ''}
+        ${s.telefone ? `<br><small>Tel: ${esc(s.telefone)}</small>` : ''}</td>
       <td class="msg">${esc(s.mensagem || '')}${s.resposta ? `<br><small><strong>Resposta:</strong> ${esc(s.resposta)}</small>` : ''}</td>
       <td>${badge(s.status)}</td>
       <td class="acoes">

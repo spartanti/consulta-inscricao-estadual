@@ -47,6 +47,17 @@ function onlyDigits(value) {
 }
 
 /** Valida um CNPJ (14 digitos) pelos digitos verificadores. */
+function isValidCpf(cpf) {
+  if (!/^\d{11}$/.test(cpf) || /^(\d)\1{10}$/.test(cpf)) return false;
+  for (const n of [9, 10]) {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += Number(cpf[i]) * (n + 1 - i);
+    const dv = ((s * 10) % 11) % 10;
+    if (dv !== Number(cpf[n])) return false;
+  }
+  return true;
+}
+
 function isValidCnpj(cnpj) {
   cnpj = onlyDigits(cnpj);
   if (cnpj.length !== 14) return false;
@@ -723,13 +734,17 @@ const server = http.createServer(async (req, res) => {
         const relacao = String(b.relacao || '').trim().slice(0, 60);
         const mensagem = String(b.mensagem || '').trim().slice(0, 2000);
         const cnpjSol = onlyDigits(String(b.cnpj || ''));
+        const cpf = onlyDigits(String(b.cpf || ''));
+        const telefone = onlyDigits(String(b.telefone || ''));
         if (!TIPOS.includes(tipo)) return sendJson(res, 400, { erro: 'Informe o tipo da solicitação.' });
         if (nome.length < 3) return sendJson(res, 400, { erro: 'Informe seu nome completo.' });
+        if (!isValidCpf(cpf)) return sendJson(res, 400, { erro: 'Informe um CPF válido (11 dígitos).' });
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return sendJson(res, 400, { erro: 'Informe um e-mail válido para retorno.' });
+        if (telefone.length < 10 || telefone.length > 13) return sendJson(res, 400, { erro: 'Informe um telefone de contato válido (com DDD).' });
         if (cnpjSol && cnpjSol.length !== 14) return sendJson(res, 400, { erro: 'CNPJ informado é inválido (14 dígitos).' });
         const dt = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const protocolo = `LGPD-${dt}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-        await db.lgpdCreate({ protocolo, tipo, cnpj: cnpjSol || null, nome, email, relacao, mensagem });
+        await db.lgpdCreate({ protocolo, tipo, cnpj: cnpjSol || null, nome, email, relacao, mensagem, cpf, telefone });
         bump('lgpd_solicitacao');
         // Exclusão com CNPJ vinculado: aplica na hora (bloqueio + remoção da base),
         // sem intervenção manual. Reversível pelo painel /lgpd-admin.

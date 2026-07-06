@@ -83,6 +83,8 @@ async function init(connStr) {
       atualizada_em TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await pool.query('ALTER TABLE lgpd_solicitacoes ADD COLUMN IF NOT EXISTS cpf TEXT;');
+  await pool.query('ALTER TABLE lgpd_solicitacoes ADD COLUMN IF NOT EXISTS telefone TEXT;');
   // CNPJs bloqueados/excluídos a pedido do titular (LGPD) — fonte da verdade do bloqueio.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS cnpj_removidos (
@@ -130,9 +132,9 @@ async function init(connStr) {
 
 async function lgpdCreate(rec) {
   await pool.query(
-    `INSERT INTO lgpd_solicitacoes (protocolo, tipo, cnpj, nome, email, relacao, mensagem)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-    [rec.protocolo, rec.tipo, rec.cnpj || null, rec.nome, rec.email, rec.relacao || null, rec.mensagem || null]
+    `INSERT INTO lgpd_solicitacoes (protocolo, tipo, cnpj, nome, email, relacao, mensagem, cpf, telefone)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+    [rec.protocolo, rec.tipo, rec.cnpj || null, rec.nome, rec.email, rec.relacao || null, rec.mensagem || null, rec.cpf || null, rec.telefone || null]
   );
   return rec.protocolo;
 }
