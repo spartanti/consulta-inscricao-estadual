@@ -565,6 +565,38 @@ function sendHtml(res, status, html, isHead) {
   res.end(isHead ? undefined : html);
 }
 
+// IndexNow: avisa Bing/Yandex (índice que alimenta ChatGPT/Copilot) sobre as
+// páginas prioritárias. Roda no boot e 1x/dia; falhas são ignoradas.
+const INDEXNOW_KEY = 'a44fdc603302747c50f538aafc28d1d5';
+function pingIndexNow() {
+  try {
+    const urls = [
+      `${seo.SITE_URL}/`, `${seo.SITE_URL}/radar`, `${seo.SITE_URL}/rankings`,
+      `${seo.SITE_URL}/busca`, `${seo.SITE_URL}/nfe`, `${seo.SITE_URL}/api`,
+      `${seo.SITE_URL}/api/painel`, `${seo.SITE_URL}/lgpd`,
+      ...Object.keys(seo.RANKINGS).flatMap((s) => [
+        `${seo.SITE_URL}/rankings/${s}`,
+        ...seo.UFS.map((uf) => `${seo.SITE_URL}/rankings/${s}/${uf.toLowerCase()}`),
+      ]),
+      ...seo.UFS.map((uf) => `${seo.SITE_URL}/sintegra/${uf.toLowerCase()}`),
+    ];
+    const body = JSON.stringify({
+      host: 'www.sintegrabrasil.com.br',
+      key: INDEXNOW_KEY,
+      keyLocation: `${seo.SITE_URL}/${INDEXNOW_KEY}.txt`,
+      urlList: urls.slice(0, 10000),
+    });
+    const req = https.request('https://api.indexnow.org/indexnow', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json; charset=utf-8', 'Content-Length': Buffer.byteLength(body) },
+    }, (r) => { r.resume(); });
+    req.on('error', () => {});
+    req.end(body);
+  } catch (e) { /* melhor esforço */ }
+}
+setTimeout(pingIndexNow, 30000).unref();
+setInterval(pingIndexNow, 24 * 60 * 60 * 1000).unref();
+
 // Contagem de empresas (badge da home) — estimativa do planner, quase de graça.
 // Atualiza a cada 10 min; a home mostra o tamanho real da base sem custo por visita.
 let totalEmpresas = 20000000;

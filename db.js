@@ -24,7 +24,17 @@ function makeSsl(connStr) {
 
 async function init(connStr) {
   if (!connStr) throw new Error('DATABASE_URL nao definido.');
-  pool = new Pool({ connectionString: connStr, ssl: makeSsl(connStr), max: 10 });
+  // Timeouts curtos: se o Postgres estiver fora, as rotas caem no fallback
+  // (CNPJ.ws) em segundos em vez de pendurar a página para sempre.
+  pool = new Pool({
+    connectionString: connStr, ssl: makeSsl(connStr), max: 10,
+    keepAlive: true,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+    statement_timeout: 20000,
+    query_timeout: 20000,
+  });
+  pool.on('error', () => {}); // conexões ociosas derrubadas não podem matar o processo
   await pool.query(`
     CREATE TABLE IF NOT EXISTS empresas (
       cnpj               TEXT PRIMARY KEY,
