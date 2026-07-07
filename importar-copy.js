@@ -68,11 +68,14 @@ function withTimeout(p, ms, label) {
   return Promise.race([Promise.resolve(p), to]).finally(() => clearTimeout(t));
 }
 function exists(f) { try { fs.accessSync(path.join(LOCAL_DIR, f)); return true; } catch (e) { return false; } }
-function csv(v) { return v == null ? '' : '"' + String(v).replace(/"/g, '""') + '"'; }
+// eslint-disable-next-line no-control-regex
+function csv(v) { return v == null ? '' : '"' + String(v).replace(/\u0000/g, '').replace(/"/g, '""') + '"'; }
 function rowCsv(d) {
   const cnae = d.atividade_principal || {};
+  // \u0000 vem sujo da fonte e o JSONB do Postgres rejeita — removemos do JSON.
+  const json = JSON.stringify(d).replace(/\\u0000/g, '');
   return [d.cnpj, d.razao_social, d.nome_fantasia, d.uf, d.municipio,
-    cnae.codigo || null, cnae.descricao || null, d.situacao_cadastral, JSON.stringify(d)]
+    cnae.codigo || null, cnae.descricao || null, d.situacao_cadastral, json]
     .map(csv).join(',');
 }
 
