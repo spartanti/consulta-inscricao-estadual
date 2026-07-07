@@ -55,8 +55,10 @@ baixar() {
 }
 
 FALHAS=0
-# Tabelas de apoio (pequenas) + as necessárias para o import
-for f in Municipios.zip Cnaes.zip; do baixar "$f" || FALHAS=$((FALHAS+1)); done
+# Tabelas de apoio (pequenas) + as necessárias para o import completo
+for f in Municipios.zip Cnaes.zip Qualificacoes.zip Naturezas.zip Motivos.zip Paises.zip Simples.zip; do
+  baixar "$f" || FALHAS=$((FALHAS+1))
+done
 
 if [ "$MODO" = "amostra" ]; then
   baixar "Empresas0.zip" || FALHAS=$((FALHAS+1))
@@ -64,6 +66,7 @@ if [ "$MODO" = "amostra" ]; then
 else
   for k in 0 1 2 3 4 5 6 7 8 9; do baixar "Empresas${k}.zip" || FALHAS=$((FALHAS+1)); done
   for k in 0 1 2 3 4 5 6 7 8 9; do baixar "Estabelecimentos${k}.zip" || FALHAS=$((FALHAS+1)); done
+  for k in 0 1 2 3 4 5 6 7 8 9; do baixar "Socios${k}.zip" || FALHAS=$((FALHAS+1)); done
 fi
 
 echo

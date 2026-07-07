@@ -31,12 +31,34 @@ const SOMENTE_ATIVAS = process.env.SOMENTE_ATIVAS === '1';
 
 const COLS = 'cnpj,razao_social,nome_fantasia,uf,municipio,cnae_codigo,cnae_descricao,situacao_cadastral,data';
 const STG = 'empresas_stg';
-// DO NOTHING: os ~20M já importados vêm da MESMA fonte (2026-06), então re-gravá-los
-// seria só bloat/lentidão. Pulamos existentes (preserva também o cache de IE enriquecido)
-// e inserimos apenas os novos. Muito mais rápido e sem write-amplification.
-const UPSERT = `INSERT INTO empresas (${COLS},updated_at)
-  SELECT DISTINCT ON (cnpj) ${COLS}, now() FROM ${STG}
-  ON CONFLICT (cnpj) DO NOTHING`;
+// Dois modos:
+//  - carga inicial (padrão): DO NOTHING — linhas do MESMO dump já presentes são
+//    puladas (rápido, sem write-amplification).
+//  - ATUALIZA=1 (dump mensal novo): DO UPDATE apenas quando algo REALMENTE mudou
+//    (WHERE ... IS DISTINCT FROM) — ~2-5% das linhas/mês. Linhas enriquecidas
+//    preservam a IE (reinjetada no JSONB novo via jsonb_set).
+const ATUALIZA = process.env.ATUALIZA === '1';
+const UPSERT = ATUALIZA
+  ? `INSERT INTO empresas (${COLS},updated_at)
+     SELECT DISTINCT ON (cnpj) ${COLS}, now() FROM ${STG}
+     ON CONFLICT (cnpj) DO UPDATE SET
+       razao_social=EXCLUDED.razao_social, nome_fantasia=EXCLUDED.nome_fantasia,
+       uf=EXCLUDED.uf, municipio=EXCLUDED.municipio,
+       cnae_codigo=EXCLUDED.cnae_codigo, cnae_descricao=EXCLUDED.cnae_descricao,
+       situacao_cadastral=EXCLUDED.situacao_cadastral,
+       data = CASE WHEN empresas.enriquecido_em IS NULL THEN EXCLUDED.data
+                   ELSE jsonb_set(EXCLUDED.data, '{inscricoes_estaduais}',
+                          COALESCE(empresas.data->'inscricoes_estaduais', '[]'::jsonb)) END,
+       updated_at = now()
+     WHERE (empresas.razao_social, empresas.nome_fantasia, empresas.uf, empresas.municipio,
+            empresas.cnae_codigo, empresas.cnae_descricao, empresas.situacao_cadastral)
+           IS DISTINCT FROM
+           (EXCLUDED.razao_social, EXCLUDED.nome_fantasia, EXCLUDED.uf, EXCLUDED.municipio,
+            EXCLUDED.cnae_codigo, EXCLUDED.cnae_descricao, EXCLUDED.situacao_cadastral)
+        OR (empresas.enriquecido_em IS NULL AND empresas.data IS DISTINCT FROM EXCLUDED.data)`
+  : `INSERT INTO empresas (${COLS},updated_at)
+     SELECT DISTINCT ON (cnpj) ${COLS}, now() FROM ${STG}
+     ON CONFLICT (cnpj) DO NOTHING`;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 // nenhuma etapa pode pendurar pra sempre num socket morto do proxy
