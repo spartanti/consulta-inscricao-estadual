@@ -142,6 +142,8 @@ async function init(connStr) {
       PRIMARY KEY (key, dia)
     );
   `);
+  // Tabela de CNAEs (1,3k linhas): traduz busca textual em códigos indexáveis.
+  await pool.query('CREATE TABLE IF NOT EXISTS cnaes (codigo TEXT PRIMARY KEY, descricao TEXT);');
   // Rankings pré-computados (rankings-build.js) — páginas /rankings.
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rankings (
@@ -498,21 +500,45 @@ async function listCnpjsChunk(offset, limit) {
 }
 
 /** Busca filtrada (consulta por CNAE/UF/municipio). */
+/** Normaliza como a base da RFB armazena: MAIÚSCULO e sem acentos. */
+function normRfb(s) {
+  return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim();
+}
+
 async function search(f = {}) {
   const where = [];
   const params = [];
   let i = 1;
-  const ila = (col) => (hasUnaccent ? `unaccent(${col}) ILIKE unaccent($${i})` : `${col} ILIKE $${i}`);
   if (f.uf) { where.push(`uf = $${i++}`); params.push(String(f.uf).toUpperCase()); }
-  if (f.municipio) { where.push(ila('municipio')); params.push('%' + f.municipio + '%'); i++; }
+  if (f.municipio) {
+    // prefixo indexável (pattern_ops): a base guarda 'VITORIA', 'SAO PAULO'...
+    where.push(`municipio LIKE $${i++}`);
+    params.push(normRfb(f.municipio) + '%');
+  }
   if (f.cnae) {
-    // por código (prefixo) OU por descrição (contém)
-    where.push(`(cnae_codigo LIKE $${i} OR ${hasUnaccent ? `unaccent(cnae_descricao) ILIKE unaccent($${i + 1})` : `cnae_descricao ILIKE $${i + 1}`})`);
-    params.push(String(f.cnae) + '%', '%' + f.cnae + '%'); i += 2;
+    const dig = String(f.cnae).replace(/\D/g, '');
+    if (dig.length >= 2 && dig.length === String(f.cnae).trim().length) {
+      // código: prefixo indexável
+      where.push(`cnae_codigo LIKE $${i++}`);
+      params.push(dig + '%');
+    } else {
+      // texto ("restaurante"): resolve na tabelinha cnaes (1,3k linhas) e usa
+      // igualdade indexada em cnae_codigo
+      const cods = await pool.query(
+        hasUnaccent
+          ? 'SELECT codigo FROM cnaes WHERE unaccent(descricao) ILIKE unaccent($1) LIMIT 200'
+          : 'SELECT codigo FROM cnaes WHERE descricao ILIKE $1 LIMIT 200',
+        ['%' + f.cnae + '%']
+      );
+      if (!cods.rows.length) return [];
+      where.push(`cnae_codigo = ANY($${i++})`);
+      params.push(cods.rows.map((r) => r.codigo));
+    }
   }
   if (f.q) {
-    where.push(`(${hasUnaccent ? `unaccent(razao_social) ILIKE unaccent($${i})` : `razao_social ILIKE $${i}`} OR ${hasUnaccent ? `unaccent(nome_fantasia) ILIKE unaccent($${i})` : `nome_fantasia ILIKE $${i}`})`);
-    params.push('%' + f.q + '%'); i++;
+    // prefixo em razão/fantasia (normalizado como a RFB armazena)
+    where.push(`(razao_social LIKE $${i} OR nome_fantasia LIKE $${i})`);
+    params.push(normRfb(f.q) + '%'); i++;
   }
   const limit = Math.min(f.limit || 50, 200);
   const offset = f.offset || 0;
